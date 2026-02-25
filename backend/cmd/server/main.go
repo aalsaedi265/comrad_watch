@@ -1,0 +1,82 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/comradwatch/backend/internal/api"
+	"github.com/comradwatch/backend/internal/config"
+	"github.com/comradwatch/backend/internal/db"
+	"github.com/comradwatch/backend/internal/rtmp"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	// Connect to PostgreSQL
+	pool, err := db.Connect(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	defer pool.Close()
+
+	queries := db.New(pool)
+
+	// Ensure segment storage directory exists
+	if err := os.MkdirAll(cfg.SegmentDir, 0755); err != nil {
+		log.Fatalf("failed to create segment directory: %v", err)
+	}
+
+	// Start RTMP ingest server
+	rtmpServer := rtmp.NewServer(cfg, queries)
+	go func() {
+		log.Printf("RTMP server listening on :%d", cfg.RTMPPort)
+		if err := rtmpServer.Start(); err != nil {
+			log.Fatalf("RTMP server error: %v", err)
+		}
+	}()
+
+	// Start HTTP API server
+	router := api.NewRouter(cfg, queries)
+	httpServer := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.HTTPPort),
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	go func() {
+		log.Printf("HTTP API server listening on :%d", cfg.HTTPPort)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down servers...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	rtmpServer.Stop()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Printf("HTTP server forced shutdown: %v", err)
+	}
+
+	log.Println("server stopped")
+}

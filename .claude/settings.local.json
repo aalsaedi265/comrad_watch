@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude config set:*)",
+      "Bash(git init:*)",
+      "Bash(go version:*)",
+      "Bash(go mod init:*)",
+      "Bash(claude mcp:*)",
+      "mcp__mcp-registry__search_mcp_registry"
+    ]
+  }
+}

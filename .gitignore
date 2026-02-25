@@ -1,0 +1,51 @@
+# Go
+backend/bin/
+backend/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Segments / video buffer
+backend/segments/
+backend/uploads/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Mobile - Android
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+
+# Mobile - iOS
+mobile/ios/build/
+mobile/ios/Pods/
+mobile/ios/*.xcworkspace
+mobile/ios/DerivedData/
+
+# Mobile - KMP
+mobile/shared/build/
+
+# Kotlin
+*.class
+*.jar
+*.war
+
+# Dependencies
+node_modules/
