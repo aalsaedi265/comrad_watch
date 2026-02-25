@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+
 	"github.com/comradwatch/backend/internal/api"
 	"github.com/comradwatch/backend/internal/config"
 	"github.com/comradwatch/backend/internal/db"
@@ -17,6 +19,9 @@ import (
 )
 
 func main() {
+	// Load .env file if present (dev convenience; not required in production)
+	_ = godotenv.Load()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
@@ -28,6 +33,11 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer pool.Close()
+
+	// Run database migrations
+	if err := db.RunMigrations(pool, "migrations"); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
 
 	queries := db.New(pool)
 

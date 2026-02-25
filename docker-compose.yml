@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: comradwatch
+      POSTGRES_USER: comradwatch
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  server:
+    build: ./backend
+    ports:
+      - "8080:8080"
+      - "1935:1935"
+    environment:
+      DATABASE_URL: postgres://comradwatch:devpassword@db:5432/comradwatch?sslmode=disable
+      JWT_SECRET: dev-secret-change-in-production
+      SEGMENT_DIR: /app/segments
+      HTTP_PORT: "8080"
+      RTMP_PORT: "1935"
+    depends_on:
+      - db
+    volumes:
+      - segments:/app/segments
+
+volumes:
+  pgdata:
+  segments:

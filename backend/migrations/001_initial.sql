@@ -47,6 +47,6 @@ CREATE TABLE IF NOT EXISTS segments (
 
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_stream_key ON sessions(stream_key);
+CREATE INDEX IF NOT EXISTS idx_sessions_stream_key ON sessions(stream_key) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_segments_session_id ON segments(session_id);
