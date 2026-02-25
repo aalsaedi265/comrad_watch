@@ -11,7 +11,27 @@
       "WebFetch(domain:github.com)",
       "Bash(go get:*)",
       "Bash(go mod tidy:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:pedrosg94.github.io)",
+      "Bash(where:*)",
+      "Bash(java:*)",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew:*)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" \"C:/Program Files/Android/Android Studio/plugins/gradle/lib/gradle.jar\":*)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" \"$JAVA_HOME/bin/java\":*)",
+      "Bash(\"C:/Program Files/Android/Android Studio/jbr/bin/java.exe\" -version)",
+      "Bash(export JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\")",
+      "Bash(\"$JAVA_HOME/bin/java.exe\" -jar \"C:/Program Files/Android/Android Studio/plugins/gradle/lib/gradle.jar\")",
+      "Bash(\"C:/Program Files/Android/Android Studio/jbr/bin/java.exe\" -cp \"C:/Program Files/Android/Android Studio/plugins/gradle/lib/gradle.jar\" org.gradle.wrapper.GradleWrapperMain --version)",
+      "Bash(curl:*)",
+      "Bash(chmod:*)",
+      "Bash(yes:*)",
+      "Bash(\"C:/Users/aalsa/AppData/Local/Android/Sdk/cmdline-tools/latest/bin/sdkmanager.bat\" \"platforms;android-35\")",
+      "Bash(ls:*)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(JAVA_HOME=\"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\" ./gradlew:*)",
+      "Bash(git add:*)"
     ]
   }
 }

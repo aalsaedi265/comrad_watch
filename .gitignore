@@ -17,6 +17,7 @@ backend/uploads/
 .env.*.local
 
 # IDE
+.claude/
 .idea/
 .vscode/
 *.swp
@@ -27,25 +28,31 @@ backend/uploads/
 .DS_Store
 Thumbs.db
 
+# Gradle (root + all subprojects)
+.gradle/
+build/
+local.properties
+
 # Mobile - Android
-mobile/android/.gradle/
-mobile/android/build/
-mobile/android/app/build/
-mobile/android/local.properties
+mobile/androidApp/build/
 
 # Mobile - iOS
-mobile/ios/build/
-mobile/ios/Pods/
-mobile/ios/*.xcworkspace
-mobile/ios/DerivedData/
+mobile/iosApp/build/
+mobile/iosApp/Pods/
+mobile/iosApp/*.xcworkspace
+mobile/iosApp/DerivedData/
 
-# Mobile - KMP
+# Mobile - shared KMP
 mobile/shared/build/
 
-# Kotlin
+# Kotlin / Java
 *.class
 *.jar
 *.war
 
 # Dependencies
 node_modules/
+
+# Kotlin build
+.kotlin/
+kotlin-js-store/

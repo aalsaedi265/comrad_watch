@@ -40,7 +40,6 @@ type activeStream struct {
 	flvEncoder *flv.Encoder
 	startedAt  time.Time
 	lastSync   time.Time
-	bytesIn    int64
 	cancel     context.CancelFunc
 }
 
@@ -76,11 +75,19 @@ func (s *Server) Start() error {
 
 func (s *Server) Stop() {
 	s.mu.Lock()
-	for key, stream := range s.streams {
-		log.Printf("finalizing stream %s on shutdown", key)
-		s.finalizeStreamLocked(key, stream, "server_shutdown")
+	// Grab all active streams and clear the map while holding the lock.
+	active := make(map[string]*activeStream, len(s.streams))
+	for k, v := range s.streams {
+		active[k] = v
+		delete(s.streams, k)
 	}
 	s.mu.Unlock()
+
+	// Finalize each stream synchronously so all data is flushed before exit.
+	for key, stream := range active {
+		log.Printf("finalizing stream %s on shutdown", key)
+		s.finalizeStream(key, stream, "server_shutdown")
+	}
 
 	if s.listener != nil {
 		s.listener.Close()
@@ -178,18 +185,8 @@ func (s *Server) onDisconnect(streamKey string, reason string) {
 	s.finalizeStream(streamKey, stream, reason)
 }
 
-// finalizeStreamLocked must be called while holding s.mu.
-func (s *Server) finalizeStreamLocked(streamKey string, stream *activeStream, reason string) {
-	delete(s.streams, streamKey)
-	go s.doFinalize(streamKey, stream, reason)
-}
-
+// finalizeStream closes the FLV file, updates DB, and starts post-processing.
 func (s *Server) finalizeStream(streamKey string, stream *activeStream, reason string) {
-	s.doFinalize(streamKey, stream, reason)
-}
-
-// doFinalize closes the FLV file, updates DB, and starts post-processing.
-func (s *Server) doFinalize(streamKey string, stream *activeStream, reason string) {
 	duration := int(time.Since(stream.startedAt).Seconds())
 	log.Printf("finalizing stream: key=%s reason=%s duration=%ds", streamKey, reason, duration)
 

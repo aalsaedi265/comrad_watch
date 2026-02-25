@@ -64,25 +64,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 	return user, nil
 }
 
-func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
-	user := &User{}
-	err := q.pool.QueryRow(ctx,
-		`SELECT id, email, password_hash, google_token_encrypted, instagram_token_encrypted,
-		        instagram_account_id, default_camera, created_at, updated_at
-		 FROM users WHERE id = $1`,
-		id,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.GoogleTokenEncrypted,
-		&user.InstagramTokenEncrypted, &user.InstagramAccountID, &user.DefaultCamera,
-		&user.CreatedAt, &user.UpdatedAt)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return user, nil
-}
-
 // --- Session operations ---
 
 type Session struct {
