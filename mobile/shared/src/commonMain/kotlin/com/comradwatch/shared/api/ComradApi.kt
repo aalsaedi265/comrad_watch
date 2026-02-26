@@ -34,6 +34,20 @@ class ComradApi(private val baseUrl: String) {
         authToken = null
     }
 
+    /** Fetch public server config (Instagram App ID, etc.). */
+    suspend fun getConfig(): Result<ServerConfigResponse> {
+        return try {
+            val response = client.get("$baseUrl/api/config")
+            if (response.status == HttpStatusCode.OK) {
+                Result.success(response.body<ServerConfigResponse>())
+            } else {
+                Result.failure(Exception("Failed to fetch config"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /** Register a new account. Returns auth token + user info. */
     suspend fun register(email: String, password: String): Result<AuthResponse> {
         return try {
@@ -84,6 +98,64 @@ class ComradApi(private val baseUrl: String) {
             }
             if (response.status == HttpStatusCode.Created) {
                 Result.success(response.body<StartSessionResponse>())
+            } else {
+                val error = response.body<ErrorResponse>()
+                Result.failure(Exception(error.error))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // --- Instagram ---
+
+    /** Connect Instagram by exchanging an OAuth authorization code. */
+    suspend fun connectInstagram(code: String, redirectUri: String): Result<ConnectInstagramResponse> {
+        return try {
+            val token = authToken ?: return Result.failure(Exception("Not logged in"))
+            val response = client.post("$baseUrl/api/instagram/connect") {
+                header("Authorization", "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(ConnectInstagramRequest(code, redirectUri))
+            }
+            if (response.status == HttpStatusCode.OK) {
+                Result.success(response.body<ConnectInstagramResponse>())
+            } else {
+                val error = response.body<ErrorResponse>()
+                Result.failure(Exception(error.error))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Check if the user has connected Instagram. */
+    suspend fun getInstagramStatus(): Result<InstagramStatusResponse> {
+        return try {
+            val token = authToken ?: return Result.failure(Exception("Not logged in"))
+            val response = client.get("$baseUrl/api/instagram/status") {
+                header("Authorization", "Bearer $token")
+            }
+            if (response.status == HttpStatusCode.OK) {
+                Result.success(response.body<InstagramStatusResponse>())
+            } else {
+                val error = response.body<ErrorResponse>()
+                Result.failure(Exception(error.error))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Disconnect Instagram from the user's account. */
+    suspend fun disconnectInstagram(): Result<Unit> {
+        return try {
+            val token = authToken ?: return Result.failure(Exception("Not logged in"))
+            val response = client.delete("$baseUrl/api/instagram/disconnect") {
+                header("Authorization", "Bearer $token")
+            }
+            if (response.status == HttpStatusCode.OK) {
+                Result.success(Unit)
             } else {
                 val error = response.body<ErrorResponse>()
                 Result.failure(Exception(error.error))

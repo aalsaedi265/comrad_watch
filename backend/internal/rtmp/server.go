@@ -14,7 +14,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/comradwatch/backend/internal/config"
+	"github.com/comradwatch/backend/internal/crypto"
 	"github.com/comradwatch/backend/internal/db"
+	"github.com/comradwatch/backend/internal/instagram"
 	"github.com/google/uuid"
 	"github.com/yutopp/go-flv"
 	flvtag "github.com/yutopp/go-flv/tag"
@@ -27,6 +29,7 @@ import (
 type Server struct {
 	cfg      *config.Config
 	queries  *db.Queries
+	ig       *instagram.Client
 	listener net.Listener
 	mu       sync.Mutex
 	streams  map[string]*activeStream // streamKey → activeStream
@@ -36,6 +39,7 @@ type Server struct {
 type activeStream struct {
 	sessionID  uuid.UUID
 	userID     uuid.UUID
+	streamKey  string
 	flvFile    *os.File
 	flvEncoder *flv.Encoder
 	startedAt  time.Time
@@ -47,6 +51,7 @@ func NewServer(cfg *config.Config, queries *db.Queries) *Server {
 	return &Server{
 		cfg:     cfg,
 		queries: queries,
+		ig:      instagram.NewClient(cfg.InstagramAppID, cfg.InstagramAppSecret),
 		streams: make(map[string]*activeStream),
 	}
 }
@@ -128,6 +133,7 @@ func (s *Server) registerStream(streamKey string) error {
 	stream := &activeStream{
 		sessionID:  session.ID,
 		userID:     session.UserID,
+		streamKey:  streamKey,
 		flvFile:    f,
 		flvEncoder: enc,
 		startedAt:  time.Now(),
@@ -222,11 +228,11 @@ func (s *Server) finalizeStream(streamKey string, stream *activeStream, reason s
 	}
 
 	// Post-process asynchronously
-	go s.postProcess(stream.sessionID)
+	go s.postProcess(stream.sessionID, stream.userID, stream.streamKey)
 }
 
 // postProcess converts FLV → MP4 via FFmpeg, then uploads.
-func (s *Server) postProcess(sessionID uuid.UUID) {
+func (s *Server) postProcess(sessionID, userID uuid.UUID, streamKey string) {
 	log.Printf("post-processing session %s", sessionID)
 
 	sessionDir := filepath.Join(s.cfg.SegmentDir, sessionID.String())
@@ -265,8 +271,60 @@ func (s *Server) postProcess(sessionID uuid.UUID) {
 	log.Printf("MP4 ready: %s", mp4Path)
 
 	// TODO Phase 3: Upload mp4Path to Google Drive
-	// TODO Phase 4: Post mp4Path to Instagram Story
+
+	// Phase 4: Post to Instagram Story (if user has connected Instagram)
+	s.postToInstagram(sessionID, userID, streamKey)
 
 	s.queries.UpdateSessionStatus(context.Background(), sessionID, "uploaded")
 	log.Printf("post-processing complete for session %s", sessionID)
+}
+
+// postToInstagram checks if the user has connected Instagram, and if so
+// publishes the session's MP4 as an Instagram Story.
+func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) {
+	ctx := context.Background()
+
+	// Check if Instagram is configured at the server level
+	if s.cfg.InstagramAppID == "" || s.cfg.InstagramAppSecret == "" {
+		log.Printf("instagram: skipping (app not configured)")
+		return
+	}
+
+	// Check if user has connected their Instagram account
+	encryptedToken, accountID, err := s.queries.GetUserInstagramToken(ctx, userID)
+	if err != nil {
+		log.Printf("instagram: error checking user token: %v", err)
+		return
+	}
+	if encryptedToken == nil || *encryptedToken == "" || accountID == nil {
+		log.Printf("instagram: skipping for session %s (user has no Instagram connected)", sessionID)
+		return
+	}
+
+	// Decrypt the access token
+	accessToken, err := crypto.Decrypt(*encryptedToken, s.cfg.JWTSecret)
+	if err != nil {
+		log.Printf("instagram: failed to decrypt token for user %s: %v", userID, err)
+		return
+	}
+
+	// Build the public video URL that Instagram can fetch.
+	// Uses the stream key as a secret URL token (no auth header needed).
+	videoURL := fmt.Sprintf("http://%s:%d/api/video/%s",
+		s.cfg.PublicHost, s.cfg.HTTPPort, streamKey)
+
+	log.Printf("instagram: posting story for session %s, video URL: %s", sessionID, videoURL)
+
+	storyID, err := s.ig.PostStory(ctx, accessToken, *accountID, videoURL)
+	if err != nil {
+		log.Printf("instagram: failed to post story for session %s: %v", sessionID, err)
+		return
+	}
+
+	// Record the story ID in the database
+	if err := s.queries.SetSessionInstagramStoryID(ctx, sessionID, storyID); err != nil {
+		log.Printf("instagram: failed to save story ID: %v", err)
+	}
+
+	log.Printf("instagram: story posted successfully for session %s (story ID: %s)", sessionID, storyID)
 }

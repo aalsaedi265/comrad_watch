@@ -41,6 +41,33 @@ data class ErrorResponse(
     val error: String
 )
 
+// --- Server config ---
+
+@Serializable
+data class ServerConfigResponse(
+    @SerialName("instagram_app_id") val instagramAppId: String = ""
+)
+
+// --- Instagram ---
+
+@Serializable
+data class ConnectInstagramRequest(
+    val code: String,
+    @SerialName("redirect_uri") val redirectUri: String
+)
+
+@Serializable
+data class ConnectInstagramResponse(
+    val username: String,
+    @SerialName("account_id") val accountId: String
+)
+
+@Serializable
+data class InstagramStatusResponse(
+    val connected: Boolean,
+    @SerialName("account_id") val accountId: String? = null
+)
+
 // --- Local app state ---
 
 data class StreamConfig(
