@@ -56,3 +56,6 @@ node_modules/
 # Kotlin build
 .kotlin/
 kotlin-js-store/
+
+# Git worktrees
+.worktrees/
