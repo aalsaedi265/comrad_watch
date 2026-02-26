@@ -16,6 +16,7 @@ import (
 	"github.com/comradwatch/backend/internal/config"
 	"github.com/comradwatch/backend/internal/crypto"
 	"github.com/comradwatch/backend/internal/db"
+	"github.com/comradwatch/backend/internal/gdrive"
 	"github.com/comradwatch/backend/internal/instagram"
 	"github.com/google/uuid"
 	"github.com/yutopp/go-flv"
@@ -270,13 +271,67 @@ func (s *Server) postProcess(sessionID, userID uuid.UUID, streamKey string) {
 
 	log.Printf("MP4 ready: %s", mp4Path)
 
-	// TODO Phase 3: Upload mp4Path to Google Drive
+	// Upload to Google Drive (if user has connected)
+	s.uploadToGoogleDrive(sessionID, userID, mp4Path)
 
-	// Phase 4: Post to Instagram Story (if user has connected Instagram)
+	// Post to Instagram Story (if user has connected Instagram)
 	s.postToInstagram(sessionID, userID, streamKey)
 
 	s.queries.UpdateSessionStatus(context.Background(), sessionID, "uploaded")
 	log.Printf("post-processing complete for session %s", sessionID)
+}
+
+// uploadToGoogleDrive uploads the MP4 to the user's Google Drive if connected.
+func (s *Server) uploadToGoogleDrive(sessionID, userID uuid.UUID, mp4Path string) {
+	ctx := context.Background()
+
+	// Check if Google Drive is configured at the server level
+	if s.cfg.GoogleClientID == "" || s.cfg.GoogleClientSecret == "" {
+		log.Printf("gdrive: skipping (not configured)")
+		return
+	}
+
+	// Check if user has connected Google Drive
+	encryptedToken, err := s.queries.GetUserGoogleToken(ctx, userID)
+	if err != nil {
+		log.Printf("gdrive: error checking user token: %v", err)
+		return
+	}
+	if encryptedToken == nil || *encryptedToken == "" {
+		log.Printf("gdrive: skipping for session %s (user has no Google Drive connected)", sessionID)
+		return
+	}
+
+	// Decrypt the token JSON
+	tokenJSON, err := crypto.Decrypt(*encryptedToken, s.cfg.EncryptionKey)
+	if err != nil {
+		log.Printf("gdrive: failed to decrypt token for user %s: %v", userID, err)
+		return
+	}
+
+	// Unmarshal the OAuth token
+	token, err := gdrive.UnmarshalToken(tokenJSON)
+	if err != nil {
+		log.Printf("gdrive: failed to unmarshal token for user %s: %v", userID, err)
+		return
+	}
+
+	// Upload
+	oauthCfg := gdrive.OAuthConfig(s.cfg.GoogleClientID, s.cfg.GoogleClientSecret, s.cfg.GoogleRedirectURI)
+	uploader := gdrive.NewUploader(oauthCfg)
+
+	fileID, err := uploader.Upload(ctx, token, mp4Path)
+	if err != nil {
+		log.Printf("gdrive: upload failed for session %s: %v", sessionID, err)
+		return
+	}
+
+	// Record the Drive file ID
+	if err := s.queries.SetSessionDriveFileID(ctx, sessionID, fileID); err != nil {
+		log.Printf("gdrive: failed to save file ID: %v", err)
+	}
+
+	log.Printf("gdrive: uploaded session %s to Google Drive (file ID: %s)", sessionID, fileID)
 }
 
 // postToInstagram checks if the user has connected Instagram, and if so

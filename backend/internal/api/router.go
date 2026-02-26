@@ -13,6 +13,7 @@ func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
 
 	auth := &authHandler{cfg: cfg, queries: queries}
 	sessions := &sessionHandler{cfg: cfg, queries: queries}
+	google := &googleHandler{cfg: cfg, queries: queries}
 	ig := &instagramHandler{
 		cfg:     cfg,
 		queries: queries,
@@ -39,6 +40,11 @@ func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
 	// Protected routes (require JWT)
 	mux.HandleFunc("POST /api/sessions/start", requireAuth(cfg, sessions.StartSession))
 	mux.HandleFunc("GET /api/sessions", requireAuth(cfg, sessions.ListSessions))
+
+	// Google Drive routes
+	mux.HandleFunc("GET /api/google/auth-url", requireAuth(cfg, google.AuthURL))
+	mux.HandleFunc("GET /api/google/callback", google.Callback) // Public — browser redirect from Google
+	mux.HandleFunc("GET /api/google/status", requireAuth(cfg, google.Status))
 
 	// Instagram routes (protected)
 	mux.HandleFunc("POST /api/instagram/connect", requireAuth(cfg, ig.ConnectInstagram))

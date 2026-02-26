@@ -139,7 +139,7 @@ class ComradApi(private val baseUrl: String) {
                 val body = response.body<GoogleStatusResponse>()
                 Result.success(body.connected)
             } else {
-                Result.failure(Exception("Failed to check Drive status"))
+                Result.failure(Exception("Failed to check Google Drive status"))
             }
         } catch (e: Exception) {
             Result.failure(e)

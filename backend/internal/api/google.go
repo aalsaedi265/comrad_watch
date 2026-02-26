@@ -39,8 +39,7 @@ func (h *googleHandler) AuthURL(w http.ResponseWriter, r *http.Request) {
 	oauthCfg := gdrive.OAuthConfig(h.cfg.GoogleClientID, h.cfg.GoogleClientSecret, h.cfg.GoogleRedirectURI)
 
 	// Encrypt the user ID as state parameter so we can identify the user on callback
-	encKey := crypto.DeriveKey(h.cfg.EncryptionKey)
-	state, err := crypto.Encrypt(encKey, userID.String())
+	state, err := crypto.Encrypt(userID.String(), h.cfg.EncryptionKey)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to generate auth state")
 		return
@@ -63,8 +62,7 @@ func (h *googleHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decrypt the state to get the user ID
-	encKey := crypto.DeriveKey(h.cfg.EncryptionKey)
-	userIDStr, err := crypto.Decrypt(encKey, state)
+	userIDStr, err := crypto.Decrypt(state, h.cfg.EncryptionKey)
 	if err != nil {
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
 		return
@@ -95,7 +93,7 @@ func (h *googleHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	encryptedToken, err := crypto.Encrypt(encKey, tokenJSON)
+	encryptedToken, err := crypto.Encrypt(tokenJSON, h.cfg.EncryptionKey)
 	if err != nil {
 		http.Error(w, "Failed to encrypt token", http.StatusInternalServerError)
 		return
