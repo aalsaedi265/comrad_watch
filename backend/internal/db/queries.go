@@ -17,6 +17,11 @@ func New(pool *pgxpool.Pool) *Queries {
 	return &Queries{pool: pool}
 }
 
+// Pool returns the underlying connection pool for ad-hoc queries.
+func (q *Queries) Pool() *pgxpool.Pool {
+	return q.pool
+}
+
 // --- User operations ---
 
 type User struct {
@@ -205,6 +210,74 @@ func (q *Queries) SetSessionDriveFileID(ctx context.Context, sessionID uuid.UUID
 		sessionID, fileID,
 	)
 	return err
+}
+
+// --- Instagram operations ---
+
+// SetUserInstagramToken stores the encrypted Instagram token and account ID for a user.
+func (q *Queries) SetUserInstagramToken(ctx context.Context, userID uuid.UUID, encryptedToken, accountID string) error {
+	_, err := q.pool.Exec(ctx,
+		`UPDATE users SET instagram_token_encrypted = $2, instagram_account_id = $3, updated_at = NOW()
+		 WHERE id = $1`,
+		userID, encryptedToken, accountID,
+	)
+	return err
+}
+
+// GetUserInstagramToken returns the encrypted token and account ID, or nil if not connected.
+func (q *Queries) GetUserInstagramToken(ctx context.Context, userID uuid.UUID) (encryptedToken *string, accountID *string, err error) {
+	err = q.pool.QueryRow(ctx,
+		`SELECT instagram_token_encrypted, instagram_account_id FROM users WHERE id = $1`,
+		userID,
+	).Scan(&encryptedToken, &accountID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+	return encryptedToken, accountID, nil
+}
+
+// ClearUserInstagramToken removes the Instagram connection for a user.
+func (q *Queries) ClearUserInstagramToken(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.pool.Exec(ctx,
+		`UPDATE users SET instagram_token_encrypted = NULL, instagram_account_id = NULL, updated_at = NOW()
+		 WHERE id = $1`,
+		userID,
+	)
+	return err
+}
+
+// SetSessionInstagramStoryID records the published story ID for a session.
+func (q *Queries) SetSessionInstagramStoryID(ctx context.Context, sessionID uuid.UUID, storyID string) error {
+	_, err := q.pool.Exec(ctx,
+		`UPDATE sessions SET instagram_story_id = $2 WHERE id = $1`,
+		sessionID, storyID,
+	)
+	return err
+}
+
+// GetSessionByID fetches a session by its primary key.
+func (q *Queries) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (*Session, error) {
+	session := &Session{}
+	err := q.pool.QueryRow(ctx,
+		`SELECT id, user_id, stream_key, started_at, ended_at, end_reason, status,
+		        total_segments, total_duration_seconds, google_drive_file_id,
+		        instagram_story_id, created_at
+		 FROM sessions WHERE id = $1`,
+		sessionID,
+	).Scan(&session.ID, &session.UserID, &session.StreamKey, &session.StartedAt,
+		&session.EndedAt, &session.EndReason, &session.Status, &session.TotalSegments,
+		&session.TotalDurationSeconds, &session.GoogleDriveFileID,
+		&session.InstagramStoryID, &session.CreatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return session, nil
 }
 
 // --- Segment operations ---

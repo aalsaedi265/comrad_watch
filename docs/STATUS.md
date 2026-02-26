@@ -24,7 +24,13 @@ Everything in `backend/`. A single Go binary that:
    - `POST /api/sessions/start` — create a streaming session, returns RTMP URL + stream key
    - `GET /api/sessions` — list user's sessions
    - `GET /api/health` — health check
-   - Files: `internal/api/router.go`, `internal/api/auth.go`, `internal/api/sessions.go`
+   - `GET /api/config` — public server config (Instagram App ID)
+   - `POST /api/instagram/connect` — exchange Instagram OAuth code for long-lived token
+   - `GET /api/instagram/status` — check if user has connected Instagram
+   - `DELETE /api/instagram/disconnect` — remove stored Instagram connection
+   - `GET /api/sessions/{id}/video` — serve recorded MP4 (auth required)
+   - `GET /api/video/{key}` — serve recorded MP4 by stream key (public, for Instagram API)
+   - Files: `internal/api/router.go`, `internal/api/auth.go`, `internal/api/sessions.go`, `internal/api/instagram.go`
 
 3. **PostgreSQL database** — users, sessions, segments tables
    - Auto-migration on startup (no manual SQL needed)
@@ -43,7 +49,7 @@ Everything in `mobile/`. A Kotlin Multiplatform project with:
 2. **Android app** (`mobile/androidApp/`) — Jetpack Compose UI
    - **Main screen**: giant pulsing red "TAP TO RECORD" button, dark background, no distractions
    - **Recording screen**: full-screen camera viewfinder, pulsing red border, timer, LIVE indicator, slide-up menu with STOP & SAVE / STOP & DISCARD
-   - **Setup screen**: one-time server URL + login/register
+   - **Setup screen**: one-time server URL + login/register + Instagram connection
    - **RootEncoder** for RTMP streaming (camera + mic capture built-in)
    - **Foreground service** keeps recording alive when app is backgrounded
    - Builds to a ~15MB APK
@@ -75,12 +81,37 @@ Backend and mobile integration for automatic Google Drive upload:
    - Android: "Connect Drive" / "Drive ✓" status chip on MainScreen (bottom-left)
    - Opens Google OAuth in default browser, auto-checks status on resume
    - Files: `shared/.../api/ComradApi.kt`, `shared/.../model/Models.kt`, `androidApp/.../ui/MainScreen.kt`
+### Phase 4: Instagram Story Posting (COMPLETE)
+
+Automatic Instagram Story posting when a recording finishes.
+
+1. **Instagram Graph API client** (`internal/instagram/client.go`)
+   - OAuth code exchange → short-lived token → long-lived token (~60 days)
+   - Story publishing: create container → poll for processing → publish
+   - User info retrieval (account ID, username)
+
+2. **Token encryption** (`internal/crypto/encrypt.go`)
+   - AES-256-GCM encryption for Instagram tokens stored in the database
+   - Key derived from JWT secret via SHA-256
+
+3. **Automatic story posting** in `postProcess()` (`internal/rtmp/server.go`)
+   - After FLV → MP4 conversion, checks if user has Instagram connected
+   - Builds a public video URL using the stream key as a secret token
+   - Creates a story container via Instagram API, polls until processed, publishes
+   - Records the story ID in the sessions table
+
+4. **Android Instagram OAuth flow**
+   - Setup screen shows "CONNECT INSTAGRAM" button after login
+   - Opens Instagram OAuth in browser, redirects back via `comradwatch://instagram-callback`
+   - Deep link handled in `MainActivity`, code exchanged via backend
+   - Shows connected/disconnected status with disconnect option
 
 ### What's NOT Built Yet
 
 | Phase | What | Context for Implementation |
 |-------|------|--------------------------|
 | **Phase 4** | **Instagram Story posting** | Backend needs Instagram Content Publishing API integration. Post the finalized MP4 as an Instagram Story. Requires Business/Creator account. Mobile app needs Instagram OAuth in KMP shared module. The `postProcess()` function has a `TODO Phase 4` comment. DB already has `instagram_story_id` column. Config has `InstagramAppID` / `InstagramAppSecret`. Note: Instagram Live is NOT possible programmatically. |
+| **Phase 3** | **Google Drive upload** | Backend needs Google Drive API integration (`google.golang.org/api/drive/v3`). On stream finalization, upload the MP4 to the user's Drive under `ComradWatch/YYYY-MM-DD/` folder. Mobile app needs Google OAuth flow in the KMP shared module. The `postProcess()` function in `server.go` has a `TODO Phase 3` comment marking exactly where upload code goes. DB already has `google_drive_file_id` column and `SetSessionDriveFileID()` query. Config already has `GoogleClientID` / `GoogleClientSecret` fields. |
 | **Phase 5** | **iOS app** | SwiftUI UI layer + AVFoundation camera + HaishinKit for RTMP streaming. The KMP shared module already compiles for iOS targets (iosX64, iosArm64, iosSimulatorArm64). The shared API client and models will be reused. Only the UI layer and camera/streaming code need to be written natively in Swift. |
 | **Phase 6** | **Polish & launch** | Reconnection logic for dropped RTMP streams, local recording gap-fill, error UX, app store submissions. |
 
@@ -91,6 +122,14 @@ Backend and mobile integration for automatic Google Drive upload:
 - Audio/video data readers are consumed on decode — MUST buffer to `bytes.Buffer` first (see handler.go)
 - `OnSetDataFrame` handler is required to capture stream metadata
 - **Google Drive**: OAuth tokens stored encrypted (AES-256-GCM). The `postProcess()` flow is: FLV → FFmpeg → MP4 → Google Drive upload → update session status. Upload is non-fatal — if it fails, the MP4 remains on disk.
+
+### Instagram API
+- Instagram Content Publishing API requires a Business or Creator account
+- Instagram Live is NOT possible programmatically — only Stories (pre-recorded video)
+- Video URL passed to Instagram must be publicly accessible (our `/api/video/{key}` endpoint)
+- Story container processing takes ~10-60 seconds; we poll every 10 seconds up to 5 minutes
+- Long-lived tokens last ~60 days; token refresh is not yet implemented (Phase 6)
+- `PUBLIC_HOST` env var must be set to the server's externally-reachable hostname
 
 ### Android / RootEncoder v2.5.3
 - Interface is `ConnectChecker` from `com.pedro.common` (NOT `ConnectCheckerRtmp`)
@@ -115,28 +154,35 @@ comrad_watch/
       api/google.go             # Google OAuth endpoints (Phase 3)
       config/config.go          # Env-based config
       crypto/crypto.go          # AES-256-GCM encrypt/decrypt (Phase 3)
+      api/instagram.go          # Instagram OAuth + video serving
+      config/config.go          # Env-based config
+      crypto/encrypt.go         # AES-256-GCM token encryption
       db/db.go                  # PostgreSQL pool
-      db/queries.go             # All SQL queries
+      db/queries.go             # All SQL queries (including Instagram)
       db/migrate.go             # Auto-migration runner
       gdrive/oauth.go           # Google OAuth config + token helpers (Phase 3)
       gdrive/upload.go          # Google Drive upload + folder management (Phase 3)
       rtmp/server.go            # RTMP server, stream lifecycle, FFmpeg post-processing, Drive upload
+      instagram/client.go       # Instagram Graph API client
+      rtmp/server.go            # RTMP server, stream lifecycle, FFmpeg, Instagram posting
       rtmp/handler.go           # RTMP protocol handler (audio/video/metadata)
     migrations/001_initial.sql  # Schema: users, sessions, segments
     Dockerfile                  # Multi-stage build (Go → Alpine + FFmpeg)
     .env.example                # Environment variable template
   mobile/
     shared/src/commonMain/.../
-      api/ComradApi.kt          # Shared HTTP client (Ktor)
-      model/Models.kt           # Data classes for API
+      api/ComradApi.kt          # Shared HTTP client (Ktor) — includes Instagram methods
+      model/Models.kt           # Data classes for API — includes Instagram types
     androidApp/src/main/kotlin/.../
+      MainActivity.kt           # Entry point + Instagram deep link handler
+      ComradApp.kt              # App singleton with API client + Instagram App ID
       ui/MainScreen.kt          # "TAP TO RECORD" button
       ui/RecordingScreen.kt     # Camera viewfinder + recording controls
-      ui/SetupScreen.kt         # One-time login/register
+      ui/SetupScreen.kt         # Login/register + Instagram connect
       ui/Navigation.kt          # Nav graph (setup → main → recording)
       ui/theme/Theme.kt         # High-contrast dark theme
       camera/CameraPreviewView.kt  # RootEncoder camera + RTMP wrapper
       service/StreamingService.kt   # Foreground service
     gradle/libs.versions.toml   # Version catalog
-  docker-compose.yml            # PostgreSQL + backend
+  docker-compose.yml            # PostgreSQL + backend (with Instagram env vars)
 ```

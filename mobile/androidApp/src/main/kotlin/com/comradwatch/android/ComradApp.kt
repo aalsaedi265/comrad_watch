@@ -10,6 +10,10 @@ class ComradApp : Application() {
     lateinit var api: ComradApi
         private set
 
+    // Instagram App ID — set from server config or hardcoded for your Meta app.
+    // This is NOT a secret (it's public in the OAuth URL).
+    var instagramAppId: String = ""
+
     override fun onCreate() {
         super.onCreate()
         instance = this

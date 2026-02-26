@@ -16,7 +16,7 @@ import (
 	"github.com/comradwatch/backend/internal/config"
 	"github.com/comradwatch/backend/internal/crypto"
 	"github.com/comradwatch/backend/internal/db"
-	"github.com/comradwatch/backend/internal/gdrive"
+	"github.com/comradwatch/backend/internal/instagram"
 	"github.com/google/uuid"
 	"github.com/yutopp/go-flv"
 	flvtag "github.com/yutopp/go-flv/tag"
@@ -29,6 +29,7 @@ import (
 type Server struct {
 	cfg      *config.Config
 	queries  *db.Queries
+	ig       *instagram.Client
 	listener net.Listener
 	mu       sync.Mutex
 	streams  map[string]*activeStream // streamKey → activeStream
@@ -38,6 +39,7 @@ type Server struct {
 type activeStream struct {
 	sessionID  uuid.UUID
 	userID     uuid.UUID
+	streamKey  string
 	flvFile    *os.File
 	flvEncoder *flv.Encoder
 	startedAt  time.Time
@@ -49,6 +51,7 @@ func NewServer(cfg *config.Config, queries *db.Queries) *Server {
 	return &Server{
 		cfg:     cfg,
 		queries: queries,
+		ig:      instagram.NewClient(cfg.InstagramAppID, cfg.InstagramAppSecret),
 		streams: make(map[string]*activeStream),
 	}
 }
@@ -130,6 +133,7 @@ func (s *Server) registerStream(streamKey string) error {
 	stream := &activeStream{
 		sessionID:  session.ID,
 		userID:     session.UserID,
+		streamKey:  streamKey,
 		flvFile:    f,
 		flvEncoder: enc,
 		startedAt:  time.Now(),
@@ -224,11 +228,11 @@ func (s *Server) finalizeStream(streamKey string, stream *activeStream, reason s
 	}
 
 	// Post-process asynchronously
-	go s.postProcess(stream.sessionID)
+	go s.postProcess(stream.sessionID, stream.userID, stream.streamKey)
 }
 
 // postProcess converts FLV → MP4 via FFmpeg, then uploads.
-func (s *Server) postProcess(sessionID uuid.UUID) {
+func (s *Server) postProcess(sessionID, userID uuid.UUID, streamKey string) {
 	log.Printf("post-processing session %s", sessionID)
 
 	sessionDir := filepath.Join(s.cfg.SegmentDir, sessionID.String())
@@ -266,67 +270,61 @@ func (s *Server) postProcess(sessionID uuid.UUID) {
 
 	log.Printf("MP4 ready: %s", mp4Path)
 
-	// Phase 3: Upload to Google Drive
-	if s.cfg.GoogleClientID != "" && s.cfg.GoogleClientSecret != "" {
-		if err := s.uploadToGoogleDrive(sessionID, mp4Path); err != nil {
-			log.Printf("Google Drive upload failed for session %s: %v", sessionID, err)
-			// Non-fatal: the MP4 is still on disk
-		}
-	}
+	// TODO Phase 3: Upload mp4Path to Google Drive
 
-	// TODO Phase 4: Post mp4Path to Instagram Story
+	// Phase 4: Post to Instagram Story (if user has connected Instagram)
+	s.postToInstagram(sessionID, userID, streamKey)
 
 	s.queries.UpdateSessionStatus(context.Background(), sessionID, "uploaded")
 	log.Printf("post-processing complete for session %s", sessionID)
 }
 
-// uploadToGoogleDrive uploads the MP4 to the user's Google Drive.
-func (s *Server) uploadToGoogleDrive(sessionID uuid.UUID, mp4Path string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+// postToInstagram checks if the user has connected Instagram, and if so
+// publishes the session's MP4 as an Instagram Story.
+func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) {
+	ctx := context.Background()
 
-	// Look up the session to get the user ID
-	session, err := s.queries.GetSessionByID(ctx, sessionID)
-	if err != nil || session == nil {
-		return fmt.Errorf("get session: %w", err)
+	// Check if Instagram is configured at the server level
+	if s.cfg.InstagramAppID == "" || s.cfg.InstagramAppSecret == "" {
+		log.Printf("instagram: skipping (app not configured)")
+		return
 	}
 
-	// Get the user's encrypted Google token
-	encryptedToken, err := s.queries.GetUserGoogleToken(ctx, session.UserID)
+	// Check if user has connected their Instagram account
+	encryptedToken, accountID, err := s.queries.GetUserInstagramToken(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("get google token: %w", err)
+		log.Printf("instagram: error checking user token: %v", err)
+		return
 	}
-	if encryptedToken == nil || *encryptedToken == "" {
-		log.Printf("user %s has not connected Google Drive, skipping upload", session.UserID)
-		return nil
+	if encryptedToken == nil || *encryptedToken == "" || accountID == nil {
+		log.Printf("instagram: skipping for session %s (user has no Instagram connected)", sessionID)
+		return
 	}
 
-	// Decrypt the token
-	encKey := crypto.DeriveKey(s.cfg.EncryptionKey)
-	tokenJSON, err := crypto.Decrypt(encKey, *encryptedToken)
+	// Decrypt the access token
+	accessToken, err := crypto.Decrypt(*encryptedToken, s.cfg.JWTSecret)
 	if err != nil {
-		return fmt.Errorf("decrypt token: %w", err)
+		log.Printf("instagram: failed to decrypt token for user %s: %v", userID, err)
+		return
 	}
 
-	token, err := gdrive.UnmarshalToken(tokenJSON)
+	// Build the public video URL that Instagram can fetch.
+	// Uses the stream key as a secret URL token (no auth header needed).
+	videoURL := fmt.Sprintf("http://%s:%d/api/video/%s",
+		s.cfg.PublicHost, s.cfg.HTTPPort, streamKey)
+
+	log.Printf("instagram: posting story for session %s, video URL: %s", sessionID, videoURL)
+
+	storyID, err := s.ig.PostStory(ctx, accessToken, *accountID, videoURL)
 	if err != nil {
-		return fmt.Errorf("unmarshal token: %w", err)
+		log.Printf("instagram: failed to post story for session %s: %v", sessionID, err)
+		return
 	}
 
-	// Upload to Google Drive
-	oauthCfg := gdrive.OAuthConfig(s.cfg.GoogleClientID, s.cfg.GoogleClientSecret, s.cfg.GoogleRedirectURI)
-	uploader := gdrive.NewUploader(oauthCfg)
-
-	fileID, err := uploader.Upload(ctx, token, mp4Path)
-	if err != nil {
-		return fmt.Errorf("upload: %w", err)
+	// Record the story ID in the database
+	if err := s.queries.SetSessionInstagramStoryID(ctx, sessionID, storyID); err != nil {
+		log.Printf("instagram: failed to save story ID: %v", err)
 	}
 
-	// Store the file ID in the session
-	if err := s.queries.SetSessionDriveFileID(ctx, sessionID, fileID); err != nil {
-		return fmt.Errorf("store file ID: %w", err)
-	}
-
-	log.Printf("uploaded to Google Drive: session=%s fileID=%s", sessionID, fileID)
-	return nil
+	log.Printf("instagram: story posted successfully for session %s (story ID: %s)", sessionID, storyID)
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/comradwatch/backend/internal/config"
 	"github.com/comradwatch/backend/internal/db"
+	"github.com/comradwatch/backend/internal/instagram"
 )
 
 func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
@@ -12,7 +13,11 @@ func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
 
 	auth := &authHandler{cfg: cfg, queries: queries}
 	sessions := &sessionHandler{cfg: cfg, queries: queries}
-	google := &googleHandler{cfg: cfg, queries: queries}
+	ig := &instagramHandler{
+		cfg:     cfg,
+		queries: queries,
+		ig:      instagram.NewClient(cfg.InstagramAppID, cfg.InstagramAppSecret),
+	}
 
 	// Public routes
 	mux.HandleFunc("POST /api/register", auth.Register)
@@ -24,14 +29,25 @@ func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	// Public config (non-secret values the mobile app needs)
+	mux.HandleFunc("GET /api/config", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"instagram_app_id": cfg.InstagramAppID,
+		})
+	})
+
 	// Protected routes (require JWT)
 	mux.HandleFunc("POST /api/sessions/start", requireAuth(cfg, sessions.StartSession))
 	mux.HandleFunc("GET /api/sessions", requireAuth(cfg, sessions.ListSessions))
 
-	// Google Drive OAuth (Phase 3)
-	mux.HandleFunc("GET /api/google/auth-url", requireAuth(cfg, google.AuthURL))
-	mux.HandleFunc("GET /api/google/callback", google.Callback) // public: Google redirects here
-	mux.HandleFunc("GET /api/google/status", requireAuth(cfg, google.Status))
+	// Instagram routes (protected)
+	mux.HandleFunc("POST /api/instagram/connect", requireAuth(cfg, ig.ConnectInstagram))
+	mux.HandleFunc("GET /api/instagram/status", requireAuth(cfg, ig.InstagramStatus))
+	mux.HandleFunc("DELETE /api/instagram/disconnect", requireAuth(cfg, ig.DisconnectInstagram))
+	mux.HandleFunc("GET /api/sessions/{id}/video", requireAuth(cfg, ig.ServeSessionVideo))
+
+	// Public video endpoint (Instagram API fetches this server-side)
+	mux.HandleFunc("GET /api/video/{key}", ig.ServePublicVideo)
 
 	return withCORS(mux)
 }
