@@ -119,6 +119,33 @@ class ComradApi(private val baseUrl: String) {
             if (response.status == HttpStatusCode.OK) {
                 val body = response.body<GoogleAuthURLResponse>()
                 Result.success(body.url)
+            } else {
+                val error = response.body<ErrorResponse>()
+                Result.failure(Exception(error.error))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Check if the user has connected Google Drive. */
+    suspend fun getGoogleDriveStatus(): Result<Boolean> {
+        return try {
+            val token = authToken ?: return Result.failure(Exception("Not logged in"))
+            val response = client.get("$baseUrl/api/google/status") {
+                header("Authorization", "Bearer $token")
+            }
+            if (response.status == HttpStatusCode.OK) {
+                val body = response.body<GoogleStatusResponse>()
+                Result.success(body.connected)
+            } else {
+                Result.failure(Exception("Failed to check Drive status"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // --- Instagram ---
 
     /** Connect Instagram by exchanging an OAuth authorization code. */
@@ -141,16 +168,6 @@ class ComradApi(private val baseUrl: String) {
         }
     }
 
-    /** Check if the user has connected Google Drive. */
-    suspend fun getGoogleDriveStatus(): Result<Boolean> {
-        return try {
-            val token = authToken ?: return Result.failure(Exception("Not logged in"))
-            val response = client.get("$baseUrl/api/google/status") {
-                header("Authorization", "Bearer $token")
-            }
-            if (response.status == HttpStatusCode.OK) {
-                val body = response.body<GoogleStatusResponse>()
-                Result.success(body.connected)
     /** Check if the user has connected Instagram. */
     suspend fun getInstagramStatus(): Result<InstagramStatusResponse> {
         return try {

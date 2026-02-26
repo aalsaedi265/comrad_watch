@@ -90,9 +90,9 @@ Automatic Instagram Story posting when a recording finishes.
    - Story publishing: create container → poll for processing → publish
    - User info retrieval (account ID, username)
 
-2. **Token encryption** (`internal/crypto/encrypt.go`)
+2. **Token encryption** (`internal/crypto/crypto.go`)
    - AES-256-GCM encryption for Instagram tokens stored in the database
-   - Key derived from JWT secret via SHA-256
+   - Uses shared crypto module (same as Google Drive token encryption)
 
 3. **Automatic story posting** in `postProcess()` (`internal/rtmp/server.go`)
    - After FLV → MP4 conversion, checks if user has Instagram connected
@@ -110,8 +110,6 @@ Automatic Instagram Story posting when a recording finishes.
 
 | Phase | What | Context for Implementation |
 |-------|------|--------------------------|
-| **Phase 4** | **Instagram Story posting** | Backend needs Instagram Content Publishing API integration. Post the finalized MP4 as an Instagram Story. Requires Business/Creator account. Mobile app needs Instagram OAuth in KMP shared module. The `postProcess()` function has a `TODO Phase 4` comment. DB already has `instagram_story_id` column. Config has `InstagramAppID` / `InstagramAppSecret`. Note: Instagram Live is NOT possible programmatically. |
-| **Phase 3** | **Google Drive upload** | Backend needs Google Drive API integration (`google.golang.org/api/drive/v3`). On stream finalization, upload the MP4 to the user's Drive under `ComradWatch/YYYY-MM-DD/` folder. Mobile app needs Google OAuth flow in the KMP shared module. The `postProcess()` function in `server.go` has a `TODO Phase 3` comment marking exactly where upload code goes. DB already has `google_drive_file_id` column and `SetSessionDriveFileID()` query. Config already has `GoogleClientID` / `GoogleClientSecret` fields. |
 | **Phase 5** | **iOS app** | SwiftUI UI layer + AVFoundation camera + HaishinKit for RTMP streaming. The KMP shared module already compiles for iOS targets (iosX64, iosArm64, iosSimulatorArm64). The shared API client and models will be reused. Only the UI layer and camera/streaming code need to be written natively in Swift. |
 | **Phase 6** | **Polish & launch** | Reconnection logic for dropped RTMP streams, local recording gap-fill, error UX, app store submissions. |
 
@@ -153,18 +151,15 @@ comrad_watch/
       api/sessions.go           # Start session, list sessions
       api/google.go             # Google OAuth endpoints (Phase 3)
       config/config.go          # Env-based config
-      crypto/crypto.go          # AES-256-GCM encrypt/decrypt (Phase 3)
+      crypto/crypto.go          # AES-256-GCM encrypt/decrypt (Phase 3 + 4)
       api/instagram.go          # Instagram OAuth + video serving
-      config/config.go          # Env-based config
-      crypto/encrypt.go         # AES-256-GCM token encryption
       db/db.go                  # PostgreSQL pool
       db/queries.go             # All SQL queries (including Instagram)
       db/migrate.go             # Auto-migration runner
       gdrive/oauth.go           # Google OAuth config + token helpers (Phase 3)
       gdrive/upload.go          # Google Drive upload + folder management (Phase 3)
-      rtmp/server.go            # RTMP server, stream lifecycle, FFmpeg post-processing, Drive upload
       instagram/client.go       # Instagram Graph API client
-      rtmp/server.go            # RTMP server, stream lifecycle, FFmpeg, Instagram posting
+      rtmp/server.go            # RTMP server, stream lifecycle, FFmpeg, Drive upload, Instagram posting
       rtmp/handler.go           # RTMP protocol handler (audio/video/metadata)
     migrations/001_initial.sql  # Schema: users, sessions, segments
     Dockerfile                  # Multi-stage build (Go → Alpine + FFmpeg)

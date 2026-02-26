@@ -51,6 +51,8 @@ data class GoogleAuthURLResponse(
 @Serializable
 data class GoogleStatusResponse(
     val connected: Boolean
+)
+
 // --- Server config ---
 
 @Serializable

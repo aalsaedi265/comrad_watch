@@ -71,7 +71,8 @@ func (h *instagramHandler) ConnectInstagram(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Step 4: Encrypt the token and store in DB
-	encrypted, err := crypto.Encrypt(longToken.AccessToken, h.cfg.JWTSecret)
+	encKey := crypto.DeriveKey(h.cfg.JWTSecret)
+	encrypted, err := crypto.Encrypt(encKey, longToken.AccessToken)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to encrypt token")
 		return

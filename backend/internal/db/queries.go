@@ -258,28 +258,6 @@ func (q *Queries) SetSessionInstagramStoryID(ctx context.Context, sessionID uuid
 	return err
 }
 
-// GetSessionByID fetches a session by its primary key.
-func (q *Queries) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (*Session, error) {
-	session := &Session{}
-	err := q.pool.QueryRow(ctx,
-		`SELECT id, user_id, stream_key, started_at, ended_at, end_reason, status,
-		        total_segments, total_duration_seconds, google_drive_file_id,
-		        instagram_story_id, created_at
-		 FROM sessions WHERE id = $1`,
-		sessionID,
-	).Scan(&session.ID, &session.UserID, &session.StreamKey, &session.StartedAt,
-		&session.EndedAt, &session.EndReason, &session.Status, &session.TotalSegments,
-		&session.TotalDurationSeconds, &session.GoogleDriveFileID,
-		&session.InstagramStoryID, &session.CreatedAt)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return session, nil
-}
-
 // --- Segment operations ---
 
 type Segment struct {
