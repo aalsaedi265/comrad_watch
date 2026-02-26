@@ -41,6 +41,16 @@ data class ErrorResponse(
     val error: String
 )
 
+// --- Google Drive (Phase 3) ---
+
+@Serializable
+data class GoogleAuthURLResponse(
+    val url: String
+)
+
+@Serializable
+data class GoogleStatusResponse(
+    val connected: Boolean
 // --- Server config ---
 
 @Serializable

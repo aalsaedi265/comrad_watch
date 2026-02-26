@@ -54,6 +54,33 @@ Everything in `mobile/`. A Kotlin Multiplatform project with:
    - **Foreground service** keeps recording alive when app is backgrounded
    - Builds to a ~15MB APK
 
+### Phase 3: Google Drive Upload (COMPLETE)
+
+Backend and mobile integration for automatic Google Drive upload:
+
+1. **Google OAuth flow** — server-side OAuth with encrypted state
+   - `GET /api/google/auth-url` — returns Google consent URL (protected, requires JWT)
+   - `GET /api/google/callback` — handles Google redirect, stores encrypted refresh token
+   - `GET /api/google/status` — check if user has connected Drive (protected)
+   - Files: `internal/api/google.go`, `internal/gdrive/oauth.go`
+
+2. **Google Drive upload** — automatic after FFmpeg conversion
+   - Creates `ComradWatch/YYYY-MM-DD/` folder structure on user's Drive
+   - Uploads MP4 with timestamped filename (e.g., `recording_14-30-05.mp4`)
+   - Stores Drive file ID in sessions table
+   - Gracefully skips if user hasn't connected Drive
+   - Files: `internal/gdrive/upload.go`, `internal/rtmp/server.go` (in `postProcess()` and `uploadToGoogleDrive()`)
+
+3. **Token encryption** — AES-256-GCM for storing OAuth tokens at rest
+   - Server-side encryption key via `ENCRYPTION_KEY` env var
+   - Used for both Google token storage and OAuth state parameter
+   - File: `internal/crypto/crypto.go`
+
+4. **Mobile integration**
+   - KMP shared module: `getGoogleAuthUrl()`, `getGoogleDriveStatus()` API methods
+   - Android: "Connect Drive" / "Drive ✓" status chip on MainScreen (bottom-left)
+   - Opens Google OAuth in default browser, auto-checks status on resume
+   - Files: `shared/.../api/ComradApi.kt`, `shared/.../model/Models.kt`, `androidApp/.../ui/MainScreen.kt`
 ### Phase 4: Instagram Story Posting (COMPLETE)
 
 Automatic Instagram Story posting when a recording finishes.
@@ -83,6 +110,7 @@ Automatic Instagram Story posting when a recording finishes.
 
 | Phase | What | Context for Implementation |
 |-------|------|--------------------------|
+| **Phase 4** | **Instagram Story posting** | Backend needs Instagram Content Publishing API integration. Post the finalized MP4 as an Instagram Story. Requires Business/Creator account. Mobile app needs Instagram OAuth in KMP shared module. The `postProcess()` function has a `TODO Phase 4` comment. DB already has `instagram_story_id` column. Config has `InstagramAppID` / `InstagramAppSecret`. Note: Instagram Live is NOT possible programmatically. |
 | **Phase 3** | **Google Drive upload** | Backend needs Google Drive API integration (`google.golang.org/api/drive/v3`). On stream finalization, upload the MP4 to the user's Drive under `ComradWatch/YYYY-MM-DD/` folder. Mobile app needs Google OAuth flow in the KMP shared module. The `postProcess()` function in `server.go` has a `TODO Phase 3` comment marking exactly where upload code goes. DB already has `google_drive_file_id` column and `SetSessionDriveFileID()` query. Config already has `GoogleClientID` / `GoogleClientSecret` fields. |
 | **Phase 5** | **iOS app** | SwiftUI UI layer + AVFoundation camera + HaishinKit for RTMP streaming. The KMP shared module already compiles for iOS targets (iosX64, iosArm64, iosSimulatorArm64). The shared API client and models will be reused. Only the UI layer and camera/streaming code need to be written natively in Swift. |
 | **Phase 6** | **Polish & launch** | Reconnection logic for dropped RTMP streams, local recording gap-fill, error UX, app store submissions. |
@@ -93,6 +121,7 @@ Automatic Instagram Story posting when a recording finishes.
 - **yutopp/go-rtmp + go-flv**: RTMP handler's `ConnConfig.Logger` must be `logrus.StandardLogger()` (not stdlib log)
 - Audio/video data readers are consumed on decode — MUST buffer to `bytes.Buffer` first (see handler.go)
 - `OnSetDataFrame` handler is required to capture stream metadata
+- **Google Drive**: OAuth tokens stored encrypted (AES-256-GCM). The `postProcess()` flow is: FLV → FFmpeg → MP4 → Google Drive upload → update session status. Upload is non-fatal — if it fails, the MP4 remains on disk.
 
 ### Instagram API
 - Instagram Content Publishing API requires a Business or Creator account
@@ -122,12 +151,18 @@ comrad_watch/
       api/router.go             # HTTP routes + CORS
       api/auth.go               # Register, login, JWT, middleware
       api/sessions.go           # Start session, list sessions
+      api/google.go             # Google OAuth endpoints (Phase 3)
+      config/config.go          # Env-based config
+      crypto/crypto.go          # AES-256-GCM encrypt/decrypt (Phase 3)
       api/instagram.go          # Instagram OAuth + video serving
       config/config.go          # Env-based config
       crypto/encrypt.go         # AES-256-GCM token encryption
       db/db.go                  # PostgreSQL pool
       db/queries.go             # All SQL queries (including Instagram)
       db/migrate.go             # Auto-migration runner
+      gdrive/oauth.go           # Google OAuth config + token helpers (Phase 3)
+      gdrive/upload.go          # Google Drive upload + folder management (Phase 3)
+      rtmp/server.go            # RTMP server, stream lifecycle, FFmpeg post-processing, Drive upload
       instagram/client.go       # Instagram Graph API client
       rtmp/server.go            # RTMP server, stream lifecycle, FFmpeg, Instagram posting
       rtmp/handler.go           # RTMP protocol handler (audio/video/metadata)

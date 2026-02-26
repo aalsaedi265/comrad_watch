@@ -107,6 +107,18 @@ class ComradApi(private val baseUrl: String) {
         }
     }
 
+    // --- Google Drive (Phase 3) ---
+
+    /** Get the Google OAuth authorization URL. Open this in a browser. */
+    suspend fun getGoogleAuthUrl(): Result<String> {
+        return try {
+            val token = authToken ?: return Result.failure(Exception("Not logged in"))
+            val response = client.get("$baseUrl/api/google/auth-url") {
+                header("Authorization", "Bearer $token")
+            }
+            if (response.status == HttpStatusCode.OK) {
+                val body = response.body<GoogleAuthURLResponse>()
+                Result.success(body.url)
     // --- Instagram ---
 
     /** Connect Instagram by exchanging an OAuth authorization code. */
@@ -129,6 +141,16 @@ class ComradApi(private val baseUrl: String) {
         }
     }
 
+    /** Check if the user has connected Google Drive. */
+    suspend fun getGoogleDriveStatus(): Result<Boolean> {
+        return try {
+            val token = authToken ?: return Result.failure(Exception("Not logged in"))
+            val response = client.get("$baseUrl/api/google/status") {
+                header("Authorization", "Bearer $token")
+            }
+            if (response.status == HttpStatusCode.OK) {
+                val body = response.body<GoogleStatusResponse>()
+                Result.success(body.connected)
     /** Check if the user has connected Instagram. */
     suspend fun getInstagramStatus(): Result<InstagramStatusResponse> {
         return try {

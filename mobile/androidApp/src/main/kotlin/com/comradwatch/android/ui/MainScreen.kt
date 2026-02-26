@@ -1,7 +1,9 @@
 package com.comradwatch.android.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -9,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,11 +19,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.comradwatch.android.ComradApp
+import kotlinx.coroutines.launch
 
 /**
  * Main screen — ONE button fills the entire screen.
@@ -36,6 +44,26 @@ fun MainScreen(
     onOpenSettings: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Google Drive connection state
+    var driveConnected by remember { mutableStateOf<Boolean?>(null) }
+    var driveLoading by remember { mutableStateOf(false) }
+
+    // Check Google Drive status when screen appears and when returning from browser
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    ComradApp.instance.api.getGoogleDriveStatus()
+                        .onSuccess { driveConnected = it }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // Pulsing animation on the button
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -74,6 +102,19 @@ fun MainScreen(
         }
     }
 
+    fun connectGoogleDrive() {
+        driveLoading = true
+        scope.launch {
+            ComradApp.instance.api.getGoogleAuthUrl()
+                .onSuccess { url ->
+                    // Open Google OAuth in the default browser
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                }
+            driveLoading = false
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -107,6 +148,44 @@ fun MainScreen(
                     textAlign = TextAlign.Center,
                     lineHeight = 34.sp
                 )
+            }
+        }
+
+        // Google Drive status — bottom left corner
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(24.dp)
+        ) {
+            when (driveConnected) {
+                true -> {
+                    // Connected indicator
+                    Text(
+                        text = "Drive ✓",
+                        fontSize = 12.sp,
+                        color = Color(0xFF4CAF50),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .background(Color(0xFF1A2E1A), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+                false -> {
+                    // Not connected — tappable
+                    Text(
+                        text = if (driveLoading) "Connecting..." else "Connect Drive",
+                        fontSize = 12.sp,
+                        color = Color(0xFFFF9800),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .background(Color(0xFF2E2010), RoundedCornerShape(8.dp))
+                            .clickable(enabled = !driveLoading) { connectGoogleDrive() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+                null -> {
+                    // Loading / unknown state — show nothing
+                }
             }
         }
 

@@ -69,6 +69,48 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 	return user, nil
 }
 
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
+	user := &User{}
+	err := q.pool.QueryRow(ctx,
+		`SELECT id, email, password_hash, google_token_encrypted, instagram_token_encrypted,
+		        instagram_account_id, default_camera, created_at, updated_at
+		 FROM users WHERE id = $1`,
+		id,
+	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.GoogleTokenEncrypted,
+		&user.InstagramTokenEncrypted, &user.InstagramAccountID, &user.DefaultCamera,
+		&user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return user, nil
+}
+
+func (q *Queries) SetUserGoogleToken(ctx context.Context, userID uuid.UUID, encryptedToken string) error {
+	_, err := q.pool.Exec(ctx,
+		`UPDATE users SET google_token_encrypted = $2, updated_at = NOW() WHERE id = $1`,
+		userID, encryptedToken,
+	)
+	return err
+}
+
+func (q *Queries) GetUserGoogleToken(ctx context.Context, userID uuid.UUID) (*string, error) {
+	var token *string
+	err := q.pool.QueryRow(ctx,
+		`SELECT google_token_encrypted FROM users WHERE id = $1`,
+		userID,
+	).Scan(&token)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return token, nil
+}
+
 // --- Session operations ---
 
 type Session struct {
@@ -109,6 +151,27 @@ func (q *Queries) GetSessionByStreamKey(ctx context.Context, streamKey string) (
 		        instagram_story_id, created_at
 		 FROM sessions WHERE stream_key = $1 AND status = 'active'`,
 		streamKey,
+	).Scan(&session.ID, &session.UserID, &session.StreamKey, &session.StartedAt,
+		&session.EndedAt, &session.EndReason, &session.Status, &session.TotalSegments,
+		&session.TotalDurationSeconds, &session.GoogleDriveFileID,
+		&session.InstagramStoryID, &session.CreatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return session, nil
+}
+
+func (q *Queries) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (*Session, error) {
+	session := &Session{}
+	err := q.pool.QueryRow(ctx,
+		`SELECT id, user_id, stream_key, started_at, ended_at, end_reason, status,
+		        total_segments, total_duration_seconds, google_drive_file_id,
+		        instagram_story_id, created_at
+		 FROM sessions WHERE id = $1`,
+		sessionID,
 	).Scan(&session.ID, &session.UserID, &session.StreamKey, &session.StartedAt,
 		&session.EndedAt, &session.EndReason, &session.Status, &session.TotalSegments,
 		&session.TotalDurationSeconds, &session.GoogleDriveFileID,
