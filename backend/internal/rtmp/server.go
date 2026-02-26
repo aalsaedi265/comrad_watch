@@ -14,7 +14,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/comradwatch/backend/internal/config"
+	"github.com/comradwatch/backend/internal/crypto"
 	"github.com/comradwatch/backend/internal/db"
+	"github.com/comradwatch/backend/internal/gdrive"
 	"github.com/google/uuid"
 	"github.com/yutopp/go-flv"
 	flvtag "github.com/yutopp/go-flv/tag"
@@ -264,9 +266,67 @@ func (s *Server) postProcess(sessionID uuid.UUID) {
 
 	log.Printf("MP4 ready: %s", mp4Path)
 
-	// TODO Phase 3: Upload mp4Path to Google Drive
+	// Phase 3: Upload to Google Drive
+	if s.cfg.GoogleClientID != "" && s.cfg.GoogleClientSecret != "" {
+		if err := s.uploadToGoogleDrive(sessionID, mp4Path); err != nil {
+			log.Printf("Google Drive upload failed for session %s: %v", sessionID, err)
+			// Non-fatal: the MP4 is still on disk
+		}
+	}
+
 	// TODO Phase 4: Post mp4Path to Instagram Story
 
 	s.queries.UpdateSessionStatus(context.Background(), sessionID, "uploaded")
 	log.Printf("post-processing complete for session %s", sessionID)
+}
+
+// uploadToGoogleDrive uploads the MP4 to the user's Google Drive.
+func (s *Server) uploadToGoogleDrive(sessionID uuid.UUID, mp4Path string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// Look up the session to get the user ID
+	session, err := s.queries.GetSessionByID(ctx, sessionID)
+	if err != nil || session == nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	// Get the user's encrypted Google token
+	encryptedToken, err := s.queries.GetUserGoogleToken(ctx, session.UserID)
+	if err != nil {
+		return fmt.Errorf("get google token: %w", err)
+	}
+	if encryptedToken == nil || *encryptedToken == "" {
+		log.Printf("user %s has not connected Google Drive, skipping upload", session.UserID)
+		return nil
+	}
+
+	// Decrypt the token
+	encKey := crypto.DeriveKey(s.cfg.EncryptionKey)
+	tokenJSON, err := crypto.Decrypt(encKey, *encryptedToken)
+	if err != nil {
+		return fmt.Errorf("decrypt token: %w", err)
+	}
+
+	token, err := gdrive.UnmarshalToken(tokenJSON)
+	if err != nil {
+		return fmt.Errorf("unmarshal token: %w", err)
+	}
+
+	// Upload to Google Drive
+	oauthCfg := gdrive.OAuthConfig(s.cfg.GoogleClientID, s.cfg.GoogleClientSecret, s.cfg.GoogleRedirectURI)
+	uploader := gdrive.NewUploader(oauthCfg)
+
+	fileID, err := uploader.Upload(ctx, token, mp4Path)
+	if err != nil {
+		return fmt.Errorf("upload: %w", err)
+	}
+
+	// Store the file ID in the session
+	if err := s.queries.SetSessionDriveFileID(ctx, sessionID, fileID); err != nil {
+		return fmt.Errorf("store file ID: %w", err)
+	}
+
+	log.Printf("uploaded to Google Drive: session=%s fileID=%s", sessionID, fileID)
+	return nil
 }

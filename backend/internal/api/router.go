@@ -12,6 +12,7 @@ func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
 
 	auth := &authHandler{cfg: cfg, queries: queries}
 	sessions := &sessionHandler{cfg: cfg, queries: queries}
+	google := &googleHandler{cfg: cfg, queries: queries}
 
 	// Public routes
 	mux.HandleFunc("POST /api/register", auth.Register)
@@ -26,6 +27,11 @@ func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
 	// Protected routes (require JWT)
 	mux.HandleFunc("POST /api/sessions/start", requireAuth(cfg, sessions.StartSession))
 	mux.HandleFunc("GET /api/sessions", requireAuth(cfg, sessions.ListSessions))
+
+	// Google Drive OAuth (Phase 3)
+	mux.HandleFunc("GET /api/google/auth-url", requireAuth(cfg, google.AuthURL))
+	mux.HandleFunc("GET /api/google/callback", google.Callback) // public: Google redirects here
+	mux.HandleFunc("GET /api/google/status", requireAuth(cfg, google.Status))
 
 	return withCORS(mux)
 }

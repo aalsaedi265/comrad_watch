@@ -92,4 +92,44 @@ class ComradApi(private val baseUrl: String) {
             Result.failure(e)
         }
     }
+
+    // --- Google Drive (Phase 3) ---
+
+    /** Get the Google OAuth authorization URL. Open this in a browser. */
+    suspend fun getGoogleAuthUrl(): Result<String> {
+        return try {
+            val token = authToken ?: return Result.failure(Exception("Not logged in"))
+            val response = client.get("$baseUrl/api/google/auth-url") {
+                header("Authorization", "Bearer $token")
+            }
+            if (response.status == HttpStatusCode.OK) {
+                val body = response.body<GoogleAuthURLResponse>()
+                Result.success(body.url)
+            } else {
+                val error = response.body<ErrorResponse>()
+                Result.failure(Exception(error.error))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Check if the user has connected Google Drive. */
+    suspend fun getGoogleDriveStatus(): Result<Boolean> {
+        return try {
+            val token = authToken ?: return Result.failure(Exception("Not logged in"))
+            val response = client.get("$baseUrl/api/google/status") {
+                header("Authorization", "Bearer $token")
+            }
+            if (response.status == HttpStatusCode.OK) {
+                val body = response.body<GoogleStatusResponse>()
+                Result.success(body.connected)
+            } else {
+                val error = response.body<ErrorResponse>()
+                Result.failure(Exception(error.error))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
