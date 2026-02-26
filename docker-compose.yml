@@ -21,6 +21,9 @@ services:
       SEGMENT_DIR: /app/segments
       HTTP_PORT: "8080"
       RTMP_PORT: "1935"
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID:-}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
     depends_on:
       - db
     volumes:
