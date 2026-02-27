@@ -357,8 +357,7 @@ func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) 
 	}
 
 	// Decrypt the access token
-	encKey := crypto.DeriveKey(s.cfg.JWTSecret)
-	accessToken, err := crypto.Decrypt(encKey, *encryptedToken)
+	accessToken, err := crypto.Decrypt(*encryptedToken, s.cfg.EncryptionKey)
 	if err != nil {
 		log.Printf("instagram: failed to decrypt token for user %s: %v", userID, err)
 		return
