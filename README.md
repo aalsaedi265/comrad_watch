@@ -1,115 +1,243 @@
 # Comrad Watch
 
-One-tap video recording for activists. Phone streams to a remote server in real-time — if the phone is destroyed, the server has the footage.
+One-tap video recording for activists. Your phone streams to a remote server in real-time — if the phone is destroyed, the server has the footage.
 
-## Prerequisites
+---
 
-- **Docker + Docker Compose** (for PostgreSQL + backend)
-- **FFmpeg** (for FLV-to-MP4 conversion, included in Docker image)
-- **Android Studio** (for building the mobile app)
-- **Go 1.24+** (only if running backend outside Docker)
+## What You Need
 
-## Quick Start
+| Tool | Required For | Install |
+|------|-------------|---------|
+| **Docker + Docker Compose** | Running everything (server + database) | [docker.com](https://docs.docker.com/get-docker/) |
+| **Go 1.24+** | Only if running backend without Docker | [go.dev](https://go.dev/dl/) |
+| **Android Studio + JDK 17** | Only if building the Android app | [developer.android.com](https://developer.android.com/studio) + [adoptium.net](https://adoptium.net/) |
+| **FFmpeg** | Included in Docker image. Manual install only if running without Docker | [ffmpeg.org](https://ffmpeg.org/download.html) |
 
-### 1. Start the backend
+---
+
+## Getting Started (Docker — Recommended)
+
+### Step 1: Clone and configure
 
 ```bash
+git clone https://github.com/aalsaedi265/comrad_watch.git
 cd comrad_watch
 
-# Copy env template
+# Create your env file from the template
 cp backend/.env.example backend/.env
-# Edit backend/.env — set a real JWT_SECRET
+```
 
-# Start PostgreSQL + backend server
+Open `backend/.env` and set these values:
+
+```env
+# REQUIRED — change these from the defaults
+JWT_SECRET=some-long-random-string-here
+ENCRYPTION_KEY=another-long-random-string-here
+
+# OPTIONAL — only needed if you want Google Drive backup
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:8080/api/google/callback
+
+# OPTIONAL — only needed if you want Instagram Story auto-post
+INSTAGRAM_APP_ID=your-ig-app-id
+INSTAGRAM_APP_SECRET=your-ig-app-secret
+```
+
+### Step 2: Start the server
+
+```bash
 docker compose up --build
 ```
 
 This starts:
-- PostgreSQL on port **5432**
-- REST API on port **8080**
-- RTMP ingest on port **1935**
+- **PostgreSQL** database on port 5432
+- **REST API + PWA** on port 8080
+- **RTMP ingest** on port 1935 (for Android app streaming)
 
-The database schema is applied automatically on first run.
+The database schema is created automatically on first run.
 
-### 2. Verify the backend
+### Step 3: Verify it works
+
+Open your browser to **http://localhost:8080** — you should see the login screen.
+
+Or test from the command line:
 
 ```bash
 curl http://localhost:8080/api/health
 # → {"status":"ok"}
-
-# Register a test user
-curl -X POST http://localhost:8080/api/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"testpass123"}'
-
-# Login
-curl -X POST http://localhost:8080/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"testpass123"}'
-# → {"token":"eyJ...","user":{...}}
 ```
 
-### 3. Build the Android app
+---
 
-```bash
-cd mobile
+## Using the Web App (PWA)
 
-# Set JAVA_HOME to Android Studio's bundled JDK
-export JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+The web app works on any phone or computer with a modern browser. This is the fastest way to start recording.
 
-# Build debug APK
-./gradlew assembleDebug
-```
+### On your phone:
 
-The APK is at: `mobile/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+1. Open **http://your-server-ip:8080** in Chrome (Android) or Safari (iPhone)
+2. Tap **Register** — enter your email and a password
+3. You'll see the main screen with a big red record button
+4. Tap the red button — allow camera and microphone when prompted
+5. You're recording! Video chunks upload to the server every 2 seconds
+6. Tap stop when done — the server converts it to MP4 and saves it
 
-### 4. Run on Android device/emulator
+### Save to home screen (acts like a native app):
 
-Install the APK on a device or emulator. On first launch:
+**iPhone (Safari):**
+1. Open the web app in Safari
+2. Tap the Share button (square with arrow)
+3. Scroll down and tap **Add to Home Screen**
+4. Tap **Add** — the Comrad Watch icon appears on your home screen
+5. Now tap the icon to launch it fullscreen, just like a real app
+
+**Android (Chrome):**
+1. Open the web app in Chrome
+2. Tap the three-dot menu (top right)
+3. Tap **Add to Home screen** (or **Install app**)
+4. Tap **Add** — the icon appears on your home screen
+
+### Connect Google Drive (optional):
+
+1. Tap the gear icon to open Settings
+2. Tap **Connect Google Drive**
+3. Sign in with your Google account and allow access
+4. All future recordings are automatically saved to your Drive in `ComradWatch/` folder
+
+### Connect Instagram (optional):
+
+1. In Settings, tap **Connect Instagram**
+2. Sign in with your Instagram account
+3. All future recordings are automatically posted as Instagram Stories
+
+---
+
+## Using the Android App
+
+The native Android app streams video via RTMP for better quality and background recording support.
+
+### Build from source:
+
+1. Install **JDK 17+** from [adoptium.net](https://adoptium.net/)
+2. Open the `mobile/` folder in Android Studio
+3. Wait for Gradle sync to finish
+4. Click **Run** (green play button) to install on a connected device or emulator
+
+### First launch:
 
 1. Enter the server URL:
-   - **Emulator**: `http://10.0.2.2:8080` (routes to host machine)
-   - **Physical device**: `http://<your-computer-ip>:8080` (same WiFi network)
-2. Register or log in with email + password
+   - **Emulator**: `http://10.0.2.2:8080`
+   - **Physical device on same WiFi**: `http://your-computer-ip:8080`
+2. Register or log in
 3. Grant camera + microphone permissions
-4. Tap the big red button to start recording + streaming
+4. Tap the red button — streaming starts immediately
 
-### Running backend without Docker
+---
 
-If you prefer running Go directly:
+## Running Without Docker
+
+If you prefer running the Go backend directly:
+
+### 1. Install and start PostgreSQL
+
+Make sure PostgreSQL is running with a database called `comradwatch`.
+
+### 2. Configure environment
 
 ```bash
-# Start PostgreSQL separately (or use an existing instance)
-# Then:
 cd backend
 cp .env.example .env
-# Edit .env with your DATABASE_URL and JWT_SECRET
+```
 
+Edit `.env` and set `DATABASE_URL` to your PostgreSQL connection string:
+
+```env
+DATABASE_URL=postgres://youruser:yourpass@localhost:5432/comradwatch?sslmode=disable
+JWT_SECRET=some-long-random-string
+ENCRYPTION_KEY=another-long-random-string
+```
+
+### 3. Run the server
+
+```bash
+cd backend
 go run ./cmd/server
 ```
 
-## Testing the RTMP stream
+The server starts on port 8080 (HTTP) and 1935 (RTMP).
 
-You can test the RTMP ingest without the mobile app using FFmpeg:
+### 4. Install FFmpeg
+
+FFmpeg is needed for converting recordings to MP4. Install it for your OS:
+
+- **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
+- **Mac**: `brew install ffmpeg`
+- **Linux**: `sudo apt install ffmpeg`
+
+---
+
+## Testing the RTMP Stream (Without a Phone)
+
+You can simulate a phone stream using FFmpeg from your terminal:
 
 ```bash
-# First, create a session via the API to get a stream key:
-TOKEN="your-jwt-token-here"
-curl -X POST http://localhost:8080/api/sessions/start \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json"
-# → {"session_id":"...","rtmp_url":"rtmp://localhost:1935/live","stream_key":"abc123..."}
+# 1. Register and login to get a JWT token
+TOKEN=$(curl -s -X POST http://localhost:8080/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"testpass123"}' | jq -r '.token')
 
-# Stream a test video:
+# 2. Start a session to get a stream key
+STREAM_KEY=$(curl -s -X POST http://localhost:8080/api/sessions/start \
+  -H "Authorization: Bearer $TOKEN" | jq -r '.stream_key')
+
+# 3. Stream a test video
 ffmpeg -f lavfi -i testsrc=size=640x480:rate=30 \
        -f lavfi -i sine=frequency=440:sample_rate=44100 \
        -c:v libx264 -preset ultrafast -tune zerolatency \
        -c:a aac -b:a 128k \
-       -f flv "rtmp://localhost:1935/live/YOUR_STREAM_KEY"
+       -f flv "rtmp://localhost:1935/live/$STREAM_KEY"
 ```
 
-After stopping the FFmpeg stream (Ctrl+C), the server will convert the FLV to MP4 automatically. Check `backend/segments/<session-id>/` for the output files.
+Press Ctrl+C to stop. The server automatically converts the FLV to MP4.
 
-## Project Status
+---
 
-See [docs/STATUS.md](docs/STATUS.md) for what's built, what's remaining, and implementation context for each phase.
+## Ports
+
+| Port | Service |
+|------|---------|
+| 8080 | HTTP API + Web App |
+| 1935 | RTMP video ingest (Android app) |
+| 5432 | PostgreSQL (Docker only) |
+
+## Project Structure
+
+```
+comrad_watch/
+  backend/
+    cmd/server/       # Entry point
+    internal/
+      api/            # REST API handlers
+      rtmp/           # RTMP video ingest + post-processing
+      db/             # Database queries + migrations
+      config/         # Environment config
+      crypto/         # AES-256 encryption
+      gdrive/         # Google Drive integration
+      instagram/      # Instagram Story integration
+    web/              # PWA frontend (HTML/CSS/JS)
+    migrations/       # SQL schema files
+  mobile/
+    shared/           # Kotlin shared code (API client)
+    androidApp/       # Android native app
+```
+
+## Status
+
+| Feature | Status |
+|---------|--------|
+| Backend (API + video ingest) | Complete |
+| Android app | Complete |
+| Google Drive auto-upload | Complete |
+| Instagram Story auto-post | Complete |
+| Web app (PWA for iPhone + desktop) | Complete |

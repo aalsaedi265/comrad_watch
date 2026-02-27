@@ -1,211 +1,488 @@
-/* Comrad Watch PWA — Dark theme matching Android app */
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/*
+ * ████████████████████████████████████████████████████████
+ *  COMRAD WATCH — CONSTRUCTIVIST UI
+ *  Inspired by Russian Constructivism & Soviet poster design
+ *
+ *  Palette : Near-Black · Soviet Red · Warm Cream
+ *  Type    : Anton (display) · IBM Plex Mono (body)
+ *  Rules   : Zero border-radius. Angular. Bold horizontals.
+ *            Red as power, not decoration.
+ * ████████████████████████████████████████████████████████
+ */
 
 :root {
-    --bg: #0A0A0A;
-    --surface: #1C1C1E;
-    --red: #FF3B30;
-    --green: #30D158;
-    --orange: #FF9500;
-    --error: #FF453A;
-    --text: #FFFFFF;
-    --muted: #666666;
-    --dim: #48484A;
+    --black:      #080808;
+    --surface:    #111111;
+    --surface-2:  #1C1C1C;
+    --red:        #C8000A;   /* Soviet red — deep, authoritative */
+    --red-hot:    #FF1A00;   /* active / pressed */
+    --red-fade:   rgba(200, 0, 10, 0.12);
+    --white:      #EDE8DF;   /* warm cream — aged propaganda paper */
+    --white-dim:  #65605A;   /* muted secondary text */
+    --rule:       #242424;   /* divider lines */
+
+    --font-display: 'Anton', sans-serif;
+    --font-body:    'IBM Plex Mono', 'Courier New', monospace;
+
+    --safe-top:    env(safe-area-inset-top,    0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ══════════════════════════════════════════
+   RESET
+══════════════════════════════════════════ */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
     height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, system-ui, 'Segoe UI', sans-serif;
     overflow: hidden;
+    background: var(--black);
+    color: var(--white);
+    font-family: var(--font-body);
+    font-size: 13px;
     -webkit-text-size-adjust: 100%;
     user-select: none;
     -webkit-user-select: none;
 }
 
-/* Screen system */
+/* ══════════════════════════════════════════
+   UTILITIES
+══════════════════════════════════════════ */
+
+.hidden { display: none !important; }
+
+/* ══════════════════════════════════════════
+   SCREEN SYSTEM
+══════════════════════════════════════════ */
+
 .screen {
-    position: absolute;
+    position: fixed;
     inset: 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: env(safe-area-inset-top, 20px) 24px env(safe-area-inset-bottom, 20px);
+    background: var(--black);
+    overflow: hidden;
 }
-.screen.hidden { display: none; }
 
-/* ========== Auth Screen ========== */
-#screen-auth { gap: 8px; }
-#screen-auth h1 {
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    color: var(--red);
-    margin-bottom: 4px;
+/* ══════════════════════════════════════════
+   SHARED: BOLD HORIZONTAL RULES
+══════════════════════════════════════════ */
+
+.auth-rule,
+.main-rule,
+.settings-rule {
+    height: 3px;
+    background: var(--red);
+    flex-shrink: 0;
 }
-.subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+/* ══════════════════════════════════════════
+   SHARED: BUTTONS
+══════════════════════════════════════════ */
+
+button {
+    border-radius: 0;
+    -webkit-appearance: none;
+    touch-action: manipulation;
+    cursor: pointer;
+    outline: none;
+    font-family: var(--font-body);
+}
+
+/* Primary — solid red fill */
+.btn-primary {
+    display: block;
+    width: 100%;
+    padding: 17px 20px;
+    background: var(--red);
+    border: none;
+    color: var(--white);
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    transition: background 0.1s;
+}
+.btn-primary:active { background: var(--red-hot); }
+
+/* Secondary — outline */
+.btn-secondary {
+    display: block;
+    width: 100%;
+    padding: 15px 20px;
+    background: transparent;
+    border: 2px solid var(--white-dim);
+    color: var(--white);
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    transition: border-color 0.1s;
+}
+.btn-secondary:active { border-color: var(--white); }
+
+/* Ghost — minimal */
+.btn-ghost {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--white-dim);
+    font-family: var(--font-body);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    padding: 12px;
+    text-align: center;
+    transition: color 0.1s;
+}
+.btn-ghost:active { color: var(--white); }
+.btn-ghost.danger { color: var(--red);   }
+
+/* Danger — red outline */
+.btn-danger {
+    display: block;
+    width: 100%;
+    padding: 13px 20px;
+    background: transparent;
+    border: 2px solid rgba(200, 0, 10, 0.4);
+    color: var(--red-hot);
+    font-family: var(--font-body);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    text-align: center;
+    transition: border-color 0.1s;
+}
+.btn-danger:active { border-color: var(--red-hot); }
+
+/* Instagram — gradient brand colour */
+.btn-ig {
+    display: block;
+    width: 100%;
+    padding: 15px 20px;
+    background: linear-gradient(90deg, #405DE6, #C13584, #FD1D1D);
+    border: none;
+    color: var(--white);
+    font-family: var(--font-display);
+    font-size: 20px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+}
+.btn-ig:active { opacity: 0.85; }
+
+/* Compact header button */
+.icon-btn {
+    background: transparent;
+    border: 1.5px solid var(--rule);
+    color: var(--white-dim);
+    font-family: var(--font-body);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    padding: 5px 11px;
+    transition: border-color 0.1s, color 0.1s;
+    white-space: nowrap;
+}
+.icon-btn:active {
+    border-color: var(--white-dim);
+    color: var(--white);
+}
+
+/* ══════════════════════════════════════════
+   FORM FIELDS
+══════════════════════════════════════════ */
+
+.field-label {
+    display: block;
+    font-family: var(--font-body);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--white-dim);
+    margin-top: 22px;
+    margin-bottom: 8px;
+}
+.field-label:first-child { margin-top: 4px; }
+
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="text"] {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--rule);
+    color: var(--white);
+    font-family: var(--font-body);
+    font-size: 16px;
+    padding: 8px 0 10px;
+    outline: none;
+    border-radius: 0;
+    -webkit-appearance: none;
+    transition: border-color 0.15s;
+}
+input:focus        { border-bottom-color: var(--white); }
+input::placeholder { color: var(--white-dim); opacity: 0.5; }
+
+.error {
+    font-family: var(--font-body);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--red-hot);
+    min-height: 16px;
+}
+
+/* ══════════════════════════════════════════
+   STATUS CHIP
+   app.js sets className directly:
+     'status-chip bottom-left connected'
+     'status-chip bottom-left disconnected'
+══════════════════════════════════════════ */
+
+/* Neutralise the absolute-positioning helpers app.js appends */
+.bottom-left,
+.bottom-right {
+    position: static !important;
+    bottom: auto !important;
+    left:   auto !important;
+    right:  auto !important;
+}
+
+.status-chip {
+    display: inline-block;
+    padding: 5px 10px;
+    font-family: var(--font-body);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    border: 1.5px solid var(--rule);
+    color: var(--white-dim);
+    background: transparent;
+    white-space: nowrap;
+    cursor: default;
+}
+.status-chip.connected    { border-color: var(--white-dim); color: var(--white); }
+.status-chip.disconnected { border-color: var(--red-fade);  color: var(--red);   cursor: pointer; }
+
+/* ══════════════════════════════════════════
+   AUTH SCREEN
+══════════════════════════════════════════ */
+
+#screen-auth { justify-content: flex-start; }
+
+.auth-brand {
+    position: relative;
+    padding: calc(var(--safe-top) + 44px) 28px 32px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* Angled red rectangle — the Constructivist background shard */
+.auth-brand::before {
+    content: '';
+    position: absolute;
+    top: -24px;
+    right: -48px;
+    width: 200px;
+    height: 200px;
+    background: var(--red);
+    transform: rotate(18deg);
+    z-index: 0;
+}
+
+/* Diagonal stripe overlay on the red shard */
+.auth-brand::after {
+    content: '';
+    position: absolute;
+    top: 16px;
+    right: 72px;
+    width: 64px;
+    height: 64px;
+    background: repeating-linear-gradient(
+        -45deg,
+        rgba(0,0,0,0.3) 0,
+        rgba(0,0,0,0.3) 5px,
+        transparent     5px,
+        transparent     11px
+    );
+    z-index: 1;
+    pointer-events: none;
+}
+
+.auth-brand h1 {
+    position: relative;
+    z-index: 2;
+    font-family: var(--font-display);
+    font-size: clamp(52px, 15vw, 80px);
+    line-height: 0.9;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: var(--white);
+}
+
+.auth-brand .subtitle {
+    position: relative;
+    z-index: 2;
+    margin-top: 16px;
+    font-family: var(--font-body);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--white-dim);
+}
+
+.auth-form {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 28px calc(var(--safe-bottom) + 20px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
 
 .form-group {
     width: 100%;
-    max-width: 340px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
 }
 
-input[type="email"], input[type="password"], input[type="url"], input[type="text"] {
-    width: 100%;
-    background: transparent;
-    border: 1px solid #444;
-    border-radius: 8px;
-    padding: 14px 16px;
-    color: var(--text);
-    font-size: 16px;
-    outline: none;
-}
-input:focus { border-color: var(--red); }
-input::placeholder { color: var(--dim); }
+/* ══════════════════════════════════════════
+   MAIN SCREEN
+══════════════════════════════════════════ */
 
-.error {
-    color: var(--error);
-    font-size: 13px;
-    min-height: 20px;
-    text-align: center;
-}
-.hidden { display: none !important; }
+#screen-main { justify-content: flex-start; }
 
-/* Buttons */
-.btn-primary {
-    width: 100%;
-    max-width: 340px;
-    padding: 14px;
-    background: var(--red);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    letter-spacing: 1px;
-}
-.btn-primary:active { opacity: 0.8; }
-
-.btn-secondary {
-    width: 100%;
-    max-width: 340px;
-    padding: 14px;
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid #444;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 500;
-    cursor: pointer;
-}
-.btn-secondary:active { opacity: 0.8; }
-
-.btn-ghost {
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: 14px;
-    cursor: pointer;
-    padding: 8px;
-    margin-top: 8px;
-}
-.btn-ghost.danger { color: var(--error); }
-
-.btn-danger {
-    width: 100%;
-    max-width: 340px;
-    padding: 12px;
-    background: transparent;
-    color: var(--error);
-    border: 1px solid var(--error);
-    border-radius: 8px;
-    font-size: 14px;
-    cursor: pointer;
+.main-header {
+    display: flex;
+    align-items: center;
+    padding: calc(var(--safe-top) + 18px) 18px 15px;
+    flex-shrink: 0;
 }
 
-.btn-ig {
-    width: 100%;
-    max-width: 340px;
-    padding: 14px;
-    background: linear-gradient(45deg, #405DE6, #833AB4, #C13584, #E1306C, #FD1D1D);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
+/* COMRAD·WATCH — "WATCH" rendered in red */
+.main-logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    flex: 1;
+    color: var(--white);
+}
+.main-logo em {
+    font-style: normal;
+    color: var(--red);
 }
 
-/* ========== Main Screen ========== */
-.app-name {
-    position: absolute;
-    top: env(safe-area-inset-top, 60px);
-    color: var(--muted);
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: 2px;
+.main-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.record-button {
-    width: 280px;
-    height: 280px;
-    border-radius: 50%;
-    background: var(--red);
-    border: none;
-    cursor: pointer;
+/* Center area — faint Constructivist grid */
+.main-center {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    animation: pulse 1.2s ease-in-out infinite alternate;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    gap: 8px;
-}
-.record-button:active { transform: scale(0.95); animation: none; }
-.record-dot { font-size: 48px; color: white; line-height: 1; }
-.record-label { font-size: 20px; font-weight: 700; color: white; letter-spacing: 2px; text-align: center; line-height: 1.3; }
-
-@keyframes pulse {
-    from { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
-    to   { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(255, 59, 48, 0); }
+    position: relative;
+    padding: 24px;
 }
 
-/* Positioning helpers */
-.bottom-left { position: absolute; bottom: env(safe-area-inset-bottom, 24px); left: 24px; }
-.bottom-right { position: absolute; bottom: env(safe-area-inset-bottom, 24px); right: 24px; }
-
-/* Status chips */
-.status-chip {
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}
-.status-chip.connected { background: #1A2E1A; color: #4CAF50; }
-.status-chip.disconnected { background: #2E2010; color: var(--orange); cursor: pointer; }
-
-.icon-btn {
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: 28px;
-    cursor: pointer;
-    padding: 8px;
-    -webkit-tap-highlight-color: transparent;
+.main-center::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(var(--surface) 1px, transparent 1px),
+        linear-gradient(90deg, var(--surface) 1px, transparent 1px);
+    background-size: 44px 44px;
+    pointer-events: none;
 }
 
-/* ========== Recording Screen ========== */
-#screen-recording { padding: 0; background: #000; }
+/* ─────────────────────────────────────────
+   THE RECORD BUTTON
+   Outer ring → gap → red inner disc → text
+───────────────────────────────────────── */
+
+.record-button {
+    position: relative;
+    z-index: 1;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    border: 4px solid var(--white);
+    background: var(--black);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    transition: border-color 0.15s;
+}
+
+/* Slowly rotating dashed outer ring */
+.record-button::before {
+    content: '';
+    position: absolute;
+    inset: -18px;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(200, 0, 10, 0.4);
+    animation: spin-slow 28s linear infinite;
+    pointer-events: none;
+}
+
+/* The red inner disc */
+.record-dot {
+    position: absolute;
+    inset: 22px;
+    border-radius: 50%;
+    background: var(--red);
+    font-size: 0;          /* hides original ● character */
+    transition: background 0.12s;
+}
+
+/* Label — sits on top of the red disc via z-index */
+.record-label {
+    position: relative;
+    z-index: 1;
+    font-family: var(--font-display);
+    font-size: 23px;
+    line-height: 1.08;
+    letter-spacing: 0.05em;
+    text-align: center;
+    text-transform: uppercase;
+    color: var(--white);
+    pointer-events: none;
+}
+
+.record-button:active .record-dot { background: var(--red-hot);    }
+.record-button:active              { border-color: var(--white-dim); }
+
+@keyframes spin-slow {
+    to { transform: rotate(360deg); }
+}
+
+/* ══════════════════════════════════════════
+   RECORDING SCREEN
+══════════════════════════════════════════ */
+
+#screen-recording {
+    padding: 0;
+    background: #000;
+}
 
 #camera-preview {
     position: absolute;
@@ -215,176 +492,271 @@ input::placeholder { color: var(--dim); }
     object-fit: cover;
 }
 
+/* Pulsing red border frame around the whole viewport */
 .recording-active::after {
     content: '';
     position: absolute;
     inset: 0;
-    border: 4px solid var(--red);
+    box-shadow: inset 0 0 0 4px var(--red);
     pointer-events: none;
     z-index: 5;
-    animation: border-pulse 0.8s ease-in-out infinite alternate;
-}
-@keyframes border-pulse {
-    from { opacity: 0.4; }
-    to   { opacity: 1; }
+    animation: frame-pulse 1s ease-in-out infinite alternate;
 }
 
+@keyframes frame-pulse {
+    from { box-shadow: inset 0 0 0 4px rgba(200, 0, 10, 0.55); }
+    to   { box-shadow: inset 0 0 0 4px rgba(255, 26,  0, 1.0);  }
+}
+
+/* Constructivist diagonal stripe — top-right corner accent */
+.rec-corner-stripe {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 88px;
+    height: 88px;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 6;
+}
+.rec-corner-stripe::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 120px;
+    height: 120px;
+    background: repeating-linear-gradient(
+        -45deg,
+        var(--red)  0,
+        var(--red)  6px,
+        transparent 6px,
+        transparent 14px
+    );
+    opacity: 0.5;
+}
+
+/* Top info bar */
 .recording-bar {
     position: absolute;
-    top: env(safe-area-inset-top, 50px);
-    left: 16px;
-    right: 16px;
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-radius: 12px;
-    padding: 10px 16px;
+    top: calc(var(--safe-top) + 14px);
+    left: 14px;
+    right: 14px;
+    background: rgba(8, 8, 8, 0.82);
+    border-left: 3px solid var(--red);
+    padding: 10px 14px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     z-index: 10;
 }
 
+/* Blinking REC dot */
 .rec-dot {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    background: var(--red);
-    animation: rec-blink 1s ease-in-out infinite;
+    background: var(--red-hot);
+    flex-shrink: 0;
+    animation: blink-sharp 1s step-end infinite;
 }
-@keyframes rec-blink {
+
+@keyframes blink-sharp {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    50%       { opacity: 0; }
 }
 
 #timer {
-    font-size: 16px;
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-size: 26px;
+    letter-spacing: 0.04em;
+    color: var(--white);
     font-variant-numeric: tabular-nums;
 }
 
 .spacer { flex: 1; }
 
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-}
-.status-dot.connecting { background: var(--orange); }
-.status-dot.live { background: var(--green); }
-.status-dot.warn { background: var(--orange); }
+.status-dot { width: 8px; height: 8px; flex-shrink: 0; }
+.status-dot.connecting { background: #FF9500; border-radius: 50%; }
+.status-dot.live       { background: #00C060; border-radius: 50%; }
+.status-dot.warn       { background: #FF9500; border-radius: 50%; }
 
 #status-text {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1px;
+    font-family: var(--font-body);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--white);
 }
 
-/* Bottom menu toggle */
+/* STOP button — angular, high contrast */
 .menu-toggle {
     position: absolute;
-    bottom: env(safe-area-inset-bottom, 30px);
+    bottom: calc(var(--safe-bottom) + 28px);
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 12px 24px;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    cursor: pointer;
+    background: rgba(8, 8, 8, 0.88);
+    border: 2px solid var(--white);
+    color: var(--white);
+    font-family: var(--font-display);
+    font-size: 20px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 14px 38px;
     z-index: 10;
+    transition: background 0.1s;
 }
+.menu-toggle:active { background: rgba(255,255,255,0.1); }
 
-/* Stop menu overlay */
+/* Stop confirmation overlay */
 .stop-menu {
     position: absolute;
     inset: 0;
-    background: rgba(0,0,0,0.7);
+    background: rgba(8, 8, 8, 0.97);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
     z-index: 20;
-    padding: 24px;
+    padding: 40px 28px calc(var(--safe-bottom) + 24px);
 }
-.stop-menu.hidden { display: none; }
 
-.btn-stop-save {
+.stop-menu-title {
+    font-family: var(--font-display);
+    font-size: 44px;
+    line-height: 0.92;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--white);
+    text-align: center;
+    margin-bottom: 22px;
+}
+
+.stop-menu-rule {
     width: 100%;
-    max-width: 300px;
-    padding: 16px;
-    background: var(--green);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    cursor: pointer;
+    height: 3px;
+    background: var(--red);
+    margin-bottom: 32px;
 }
 
-.btn-stop-discard {
+#btn-stop-save {
+    display: block;
     width: 100%;
-    max-width: 300px;
-    padding: 16px;
-    background: var(--dim);
-    color: white;
+    padding: 19px 20px;
+    background: var(--red);
     border: none;
-    border-radius: 12px;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    cursor: pointer;
+    color: var(--white);
+    font-family: var(--font-display);
+    font-size: 26px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 12px;
+    transition: background 0.1s;
 }
+#btn-stop-save:active { background: var(--red-hot); }
 
-/* ========== Settings Screen ========== */
-#screen-settings {
-    justify-content: flex-start;
-    padding-top: env(safe-area-inset-top, 60px);
-    overflow-y: auto;
+#btn-stop-discard {
+    display: block;
+    width: 100%;
+    padding: 14px 20px;
+    background: transparent;
+    border: 2px solid var(--surface-2);
+    color: var(--white-dim);
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 8px;
+    transition: border-color 0.1s, color 0.1s;
 }
+#btn-stop-discard:active { border-color: var(--white-dim); color: var(--white); }
+
+/* ══════════════════════════════════════════
+   SETTINGS SCREEN
+══════════════════════════════════════════ */
+
+#screen-settings { justify-content: flex-start; }
 
 .settings-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    width: 100%;
-    max-width: 400px;
-    margin-bottom: 24px;
-}
-.settings-header h2 {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: 1px;
+    padding: calc(var(--safe-top) + 18px) 20px 16px;
+    flex-shrink: 0;
+    gap: 14px;
 }
 
+.settings-header h2 {
+    font-family: var(--font-display);
+    font-size: 30px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--white);
+}
+
+/* Back button — square, not rounded */
+#btn-back {
+    background: transparent;
+    border: 2px solid var(--rule);
+    color: var(--white);
+    font-family: var(--font-display);
+    font-size: 18px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.1s;
+}
+#btn-back:active { border-color: var(--white-dim); }
+
 .settings-body {
-    width: 100%;
-    max-width: 400px;
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px calc(var(--safe-bottom) + 20px);
     display: flex;
     flex-direction: column;
-    gap: 12px;
+}
+
+.settings-section {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .section-label {
-    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--white-dim);
+}
+
+#settings-server-display {
+    font-family: var(--font-body);
     font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    margin-top: 16px;
+    color: var(--white);
+    word-break: break-all;
 }
 
-.hint { color: var(--dim); font-size: 13px; }
-
+/* Status lines (set by app.js: className = 'status-line ok/off') */
 .status-line {
-    font-size: 14px;
-    padding: 8px 0;
+    font-family: var(--font-body);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
 }
-.status-line.ok { color: var(--green); }
-.status-line.off { color: var(--muted); }
+.status-line.ok  { color: var(--white); }
+.status-line.off { color: var(--white-dim); }
+
+#btn-logout {
+    margin-top: 24px;
+    border-top: 1px solid var(--rule);
+    padding-top: 20px;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+}

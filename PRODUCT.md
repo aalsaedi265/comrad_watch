@@ -81,7 +81,7 @@ The phone streams video using RTMP (the same protocol used by Twitch and YouTube
 | Android app | Complete |
 | Google Drive auto-upload | Complete |
 | Instagram Story auto-post | Complete |
-| Web app (iOS + desktop) | In Progress |
+| Web app (iOS + desktop) | Complete |
 
 ## Get Involved
 
