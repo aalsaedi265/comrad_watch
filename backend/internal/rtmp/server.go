@@ -383,3 +383,54 @@ func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) 
 
 	log.Printf("instagram: story posted successfully for session %s (story ID: %s)", sessionID, storyID)
 }
+
+// PostProcessWebSession is called by the API layer when a PWA recording ends.
+// It converts the raw browser recording (webm/mp4) to MP4, then uploads.
+func (s *Server) PostProcessWebSession(sessionID, userID uuid.UUID, streamKey, rawPath, mimeType string) {
+	go s.postProcessWeb(sessionID, userID, streamKey, rawPath, mimeType)
+}
+
+func (s *Server) postProcessWeb(sessionID, userID uuid.UUID, streamKey, rawPath, mimeType string) {
+	log.Printf("post-processing web session %s (format: %s)", sessionID, mimeType)
+
+	sessionDir := filepath.Join(s.cfg.SegmentDir, sessionID.String())
+	mp4Path := filepath.Join(sessionDir, "recording.mp4")
+
+	if _, err := os.Stat(rawPath); os.IsNotExist(err) {
+		log.Printf("no raw file found for web session %s", sessionID)
+		s.queries.UpdateSessionStatus(context.Background(), sessionID, "failed")
+		return
+	}
+
+	// Convert to MP4 using FFmpeg.
+	// Browser may send webm (VP8/VP9+Opus) or mp4 (H.264+AAC).
+	// Re-encode to ensure MP4 compatibility in all cases.
+	cmd := exec.CommandContext(
+		context.Background(),
+		"ffmpeg",
+		"-i", rawPath,
+		"-c:v", "libx264",
+		"-preset", "fast",
+		"-c:a", "aac",
+		"-movflags", "+faststart",
+		"-y",
+		mp4Path,
+	)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("FFmpeg conversion failed for web session %s: %v", sessionID, err)
+		s.queries.UpdateSessionStatus(context.Background(), sessionID, "finalized_raw")
+		return
+	}
+
+	log.Printf("MP4 ready (web): %s", mp4Path)
+
+	// Reuse existing upload functions
+	s.uploadToGoogleDrive(sessionID, userID, mp4Path)
+	s.postToInstagram(sessionID, userID, streamKey)
+
+	s.queries.UpdateSessionStatus(context.Background(), sessionID, "uploaded")
+	log.Printf("post-processing complete for web session %s", sessionID)
+}

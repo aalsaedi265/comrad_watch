@@ -55,14 +55,14 @@ func main() {
 		}
 	}()
 
-	// Start HTTP API server
-	router := api.NewRouter(cfg, queries)
+	// Start HTTP API server (serves both REST API and PWA static files)
+	router := api.NewRouter(cfg, queries, rtmpServer)
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  60 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	go func() {

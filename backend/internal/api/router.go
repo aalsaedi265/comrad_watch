@@ -6,9 +6,10 @@ import (
 	"github.com/comradwatch/backend/internal/config"
 	"github.com/comradwatch/backend/internal/db"
 	"github.com/comradwatch/backend/internal/instagram"
+	"github.com/comradwatch/backend/internal/rtmp"
 )
 
-func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
+func NewRouter(cfg *config.Config, queries *db.Queries, rtmpSrv *rtmp.Server) http.Handler {
 	mux := http.NewServeMux()
 
 	auth := &authHandler{cfg: cfg, queries: queries}
@@ -54,6 +55,15 @@ func NewRouter(cfg *config.Config, queries *db.Queries) http.Handler {
 
 	// Public video endpoint (Instagram API fetches this server-side)
 	mux.HandleFunc("GET /api/video/{key}", ig.ServePublicVideo)
+
+	// PWA chunk upload routes (protected)
+	chunks := &chunkHandler{cfg: cfg, queries: queries, rtmpSrv: rtmpSrv}
+	mux.HandleFunc("POST /api/sessions/{id}/chunk", requireAuth(cfg, chunks.ReceiveChunk))
+	mux.HandleFunc("POST /api/sessions/{id}/end", requireAuth(cfg, chunks.EndWebSession))
+
+	// Serve PWA static files from web/ directory
+	// API routes take priority (more specific patterns win in Go 1.22+ mux)
+	mux.Handle("/", http.FileServer(http.Dir("web")))
 
 	return withCORS(mux)
 }
