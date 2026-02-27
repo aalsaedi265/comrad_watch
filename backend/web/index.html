@@ -6,43 +6,62 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Comrad Watch">
-    <meta name="theme-color" content="#0A0A0A">
+    <meta name="theme-color" content="#080808">
     <title>Comrad Watch</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
 <body>
 
-<!-- Screen: Login/Register -->
+<!-- ▓▓▓ SCREEN 1: AUTH ▓▓▓ -->
 <div id="screen-auth" class="screen active">
-    <h1>COMRAD WATCH</h1>
-    <p class="subtitle">Your footage survives</p>
-    <div class="form-group">
-        <input id="server-url" type="url" placeholder="Server URL (e.g. https://your-server.com)">
-        <input id="email" type="email" placeholder="Email" autocomplete="email">
-        <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="auth-brand">
+        <h1>COMRAD<br>WATCH</h1>
+        <p class="subtitle">YOUR FOOTAGE SURVIVES.</p>
     </div>
-    <p id="auth-error" class="error hidden"></p>
-    <button id="btn-login" class="btn-primary">LOG IN</button>
-    <button id="btn-register" class="btn-secondary hidden">CREATE ACCOUNT</button>
-    <button id="btn-toggle-auth" class="btn-ghost">Need an account? Register</button>
+    <div class="auth-rule"></div>
+    <div class="auth-form">
+        <div class="form-group">
+            <label class="field-label" for="server-url">Server URL</label>
+            <input id="server-url" type="url" placeholder="https://your-server.com" autocomplete="url">
+            <label class="field-label" for="email">Email</label>
+            <input id="email" type="email" placeholder="activist@example.com" autocomplete="email">
+            <label class="field-label" for="password">Password</label>
+            <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <p id="auth-error" class="error hidden"></p>
+        <button id="btn-login" class="btn-primary">LOG IN</button>
+        <button id="btn-register" class="btn-secondary hidden">CREATE ACCOUNT</button>
+        <button id="btn-toggle-auth" class="btn-ghost">Need an account? Register</button>
+    </div>
 </div>
 
-<!-- Screen: Main (big red button) -->
+<!-- ▓▓▓ SCREEN 2: MAIN ▓▓▓ -->
 <div id="screen-main" class="screen hidden">
-    <p class="app-name">COMRAD WATCH</p>
-    <button id="btn-record" class="record-button" aria-label="Tap to record">
-        <span class="record-dot">&#9679;</span>
-        <span class="record-label">TAP TO<br>RECORD</span>
-    </button>
-    <div id="drive-chip" class="status-chip bottom-left hidden"></div>
-    <button id="btn-settings" class="icon-btn bottom-right" aria-label="Settings">&#9881;</button>
+    <div class="main-header">
+        <span class="main-logo">COMRAD<em>WATCH</em></span>
+        <div class="main-header-actions">
+            <div id="drive-chip" class="status-chip bottom-left hidden"></div>
+            <button id="btn-settings" class="icon-btn bottom-right">SETTINGS</button>
+        </div>
+    </div>
+    <div class="main-rule"></div>
+    <div class="main-center">
+        <button id="btn-record" class="record-button" aria-label="Tap to record">
+            <span class="record-dot"></span>
+            <span class="record-label">TAP TO<br>RECORD</span>
+        </button>
+    </div>
 </div>
 
-<!-- Screen: Recording -->
+<!-- ▓▓▓ SCREEN 3: RECORDING ▓▓▓ -->
 <div id="screen-recording" class="screen hidden recording-active">
     <video id="camera-preview" autoplay muted playsinline></video>
+    <div class="rec-corner-stripe"></div>
     <div class="recording-bar">
         <span class="rec-dot"></span>
         <span id="timer">00:00</span>
@@ -50,34 +69,40 @@
         <span id="status-dot" class="status-dot connecting"></span>
         <span id="status-text">CONNECTING</span>
     </div>
-    <button id="btn-show-menu" class="menu-toggle">&#9650; MENU</button>
+    <button id="btn-show-menu" class="menu-toggle">&#9632; STOP</button>
     <div id="stop-menu" class="stop-menu hidden">
-        <button id="btn-stop-save" class="btn-stop-save">STOP &amp; SAVE</button>
-        <button id="btn-stop-discard" class="btn-stop-discard">STOP &amp; DISCARD</button>
-        <button id="btn-cancel-menu" class="btn-ghost" style="color:white">CANCEL</button>
+        <p class="stop-menu-title">STOP<br>RECORDING?</p>
+        <div class="stop-menu-rule"></div>
+        <button id="btn-stop-save" class="btn-stop-save">SAVE &amp; UPLOAD</button>
+        <button id="btn-stop-discard" class="btn-stop-discard">DISCARD</button>
+        <button id="btn-cancel-menu" class="btn-ghost">CANCEL</button>
     </div>
 </div>
 
-<!-- Screen: Settings -->
+<!-- ▓▓▓ SCREEN 4: SETTINGS ▓▓▓ -->
 <div id="screen-settings" class="screen hidden">
     <div class="settings-header">
         <button id="btn-back" class="icon-btn">&#8592;</button>
         <h2>SETTINGS</h2>
     </div>
+    <div class="settings-rule"></div>
     <div class="settings-body">
-        <p class="section-label">SERVER</p>
-        <p id="settings-server-display" class="status-line ok"></p>
-
-        <p class="section-label">GOOGLE DRIVE</p>
-        <p id="drive-status-settings" class="status-line off">Checking...</p>
-        <button id="btn-connect-drive" class="btn-secondary hidden">CONNECT DRIVE</button>
-
-        <p class="section-label">INSTAGRAM</p>
-        <p id="ig-status-settings" class="status-line off">Checking...</p>
-        <button id="btn-connect-ig" class="btn-ig hidden">CONNECT INSTAGRAM</button>
-        <button id="btn-disconnect-ig" class="btn-danger hidden">Disconnect Instagram</button>
-
-        <button id="btn-logout" class="btn-ghost danger" style="margin-top:32px">LOG OUT</button>
+        <div class="settings-section">
+            <p class="section-label">Server</p>
+            <p id="settings-server-display" class="status-line ok"></p>
+        </div>
+        <div class="settings-section">
+            <p class="section-label">Google Drive</p>
+            <p id="drive-status-settings" class="status-line off">Checking...</p>
+            <button id="btn-connect-drive" class="btn-secondary hidden">CONNECT DRIVE</button>
+        </div>
+        <div class="settings-section">
+            <p class="section-label">Instagram</p>
+            <p id="ig-status-settings" class="status-line off">Checking...</p>
+            <button id="btn-connect-ig" class="btn-ig hidden">CONNECT INSTAGRAM</button>
+            <button id="btn-disconnect-ig" class="btn-danger hidden">DISCONNECT</button>
+        </div>
+        <button id="btn-logout" class="btn-ghost danger">LOG OUT</button>
     </div>
 </div>
 
