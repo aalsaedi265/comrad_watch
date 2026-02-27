@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 
 	"github.com/comradwatch/backend/internal/config"
@@ -50,7 +51,7 @@ func (h *sessionHandler) StartSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, startSessionResponse{
 		SessionID: session.ID.String(),
 		StreamKey: streamKey,
-		RTMPUrl:   "rtmp://YOUR_SERVER_IP:1935/live/" + streamKey,
+		RTMPUrl:   fmt.Sprintf("rtmp://%s:%d/live/%s", h.cfg.PublicHost, h.cfg.RTMPPort, streamKey),
 	})
 }
 
