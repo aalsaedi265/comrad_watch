@@ -12,6 +12,7 @@ var state = {
     timerInterval: null,
     elapsedSeconds: 0,
     uploadActive: false,
+    startingRecording: false, // guard against double-tap
     driveConnected: null,
     igConnected: null,
     igAccountId: null,
@@ -167,7 +168,20 @@ function toggleAuthMode() {
 }
 
 function logout() {
+    // Stop active recording before logging out
+    if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+        stopRecording(true);
+    }
+    // Clean up camera if still open
+    if (state.cameraStream) {
+        state.cameraStream.getTracks().forEach(function(t) { t.stop(); });
+        state.cameraStream = null;
+    }
     state.token = null;
+    state.sessionId = null;
+    state.streamKey = null;
+    state.driveConnected = null;
+    state.igConnected = null;
     localStorage.removeItem('comrad_token');
     showScreen('auth');
 }
@@ -203,14 +217,19 @@ function updateDriveChip() {
 
 // ==================== Recording ====================
 function startRecording() {
+    // Guard: prevent double-tap from creating duplicate sessions
+    if (state.startingRecording || state.uploadActive || state.sessionId) return;
+
     if (!window.MediaRecorder) {
         alert('Recording is not supported on this browser. Please update to iOS 14.5+ or use a modern browser.');
         return;
     }
 
+    state.startingRecording = true;
+
     // Request camera
     navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: true,
     }).then(function(stream) {
         state.cameraStream = stream;
@@ -221,11 +240,16 @@ function startRecording() {
             state.streamKey = session.stream_key;
             state.elapsedSeconds = 0;
             state.uploadActive = true;
+            state.startingRecording = false;
+
+            // Ensure stop menu is hidden for fresh recording
+            document.getElementById('stop-menu').classList.add('hidden');
 
             // Show recording screen
             showScreen('recording');
             var video = document.getElementById('camera-preview');
             video.srcObject = stream;
+            video.play().catch(function() {}); // explicit play for Safari
 
             // Pick MIME type
             state.mimeType = pickMimeType();
@@ -244,6 +268,11 @@ function startRecording() {
                 });
             };
 
+            state.mediaRecorder.onerror = function(e) {
+                console.error('MediaRecorder error:', e);
+                stopRecording(false);
+            };
+
             // Record in 2-second chunks
             state.mediaRecorder.start(2000);
             setStatus('CONNECTING', 'connecting');
@@ -256,6 +285,12 @@ function startRecording() {
             }, 1000);
         });
     }).catch(function(e) {
+        state.startingRecording = false;
+        // Clean up camera if it was opened but session-start failed
+        if (state.cameraStream) {
+            state.cameraStream.getTracks().forEach(function(t) { t.stop(); });
+            state.cameraStream = null;
+        }
         alert('Camera access required. Please allow camera and microphone permissions.\n\n' + e.message);
     });
 }
@@ -373,7 +408,7 @@ function loadSettingsScreen() {
 
 function connectDrive() {
     api('GET', '/api/google/auth-url').then(function(data) {
-        window.open(data.url, '_blank');
+        window.location.href = data.url;
     }).catch(function(e) {
         alert('Failed to get Google auth URL: ' + e.message);
     });

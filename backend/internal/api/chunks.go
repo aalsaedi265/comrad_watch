@@ -48,6 +48,9 @@ func (h *chunkHandler) ReceiveChunk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit chunk size to 10MB to prevent disk abuse
+	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
+
 	// Append chunk to the recording file (streaming, no memory buffering)
 	recordingPath := filepath.Join(h.cfg.SegmentDir, sessionID.String(), "recording.webm")
 

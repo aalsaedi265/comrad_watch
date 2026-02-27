@@ -365,8 +365,8 @@ func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) 
 
 	// Build the public video URL that Instagram can fetch.
 	// Uses the stream key as a secret URL token (no auth header needed).
-	videoURL := fmt.Sprintf("http://%s:%d/api/video/%s",
-		s.cfg.PublicHost, s.cfg.HTTPPort, streamKey)
+	videoURL := fmt.Sprintf("https://%s/api/video/%s",
+		s.cfg.PublicHost, streamKey)
 
 	log.Printf("instagram: posting story for session %s, video URL: %s", sessionID, videoURL)
 
