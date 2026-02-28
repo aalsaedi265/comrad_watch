@@ -70,6 +70,13 @@ function api(method, path, body, requiresAuth) {
     var opts = { method: method, headers: headers };
     if (body) opts.body = JSON.stringify(body);
     return fetch(url, opts).then(function(res) {
+        // Handle expired token — redirect to login
+        if (res.status === 401 && requiresAuth) {
+            state.token = null;
+            localStorage.removeItem('comrad_token');
+            showScreen('auth');
+            throw new Error('Session expired. Please log in again.');
+        }
         if (!res.ok) {
             return res.json().catch(function() {
                 return { error: res.statusText };
@@ -91,8 +98,32 @@ function uploadChunk(sessionId, blob) {
         },
         body: blob,
     }).then(function(res) {
+        if (res.status === 401) {
+            state.token = null;
+            localStorage.removeItem('comrad_token');
+            stopRecording(true);
+            showScreen('auth');
+            throw new Error('Session expired');
+        }
         if (!res.ok) throw new Error('chunk upload failed: ' + res.status);
         return res.json();
+    });
+}
+
+function uploadWithRetry(sessionId, blob, attempt) {
+    if (!attempt) attempt = 0;
+    var maxRetries = 3;
+    return uploadChunk(sessionId, blob).catch(function(err) {
+        if (attempt < maxRetries && state.uploadActive) {
+            var delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+            return new Promise(function(resolve, reject) {
+                setTimeout(function() {
+                    uploadWithRetry(sessionId, blob, attempt + 1)
+                        .then(resolve).catch(reject);
+                }, delay);
+            });
+        }
+        throw err;
     });
 }
 
@@ -261,10 +292,10 @@ function startRecording() {
 
             state.mediaRecorder.ondataavailable = function(e) {
                 if (!state.uploadActive || e.data.size === 0) return;
-                uploadChunk(state.sessionId, e.data).then(function() {
+                uploadWithRetry(state.sessionId, e.data).then(function() {
                     setStatus('LIVE', 'live');
                 }).catch(function() {
-                    setStatus('RECONNECTING', 'warn');
+                    setStatus('UPLOAD FAILED', 'warn');
                 });
             };
 
@@ -327,6 +358,8 @@ function stopRecording(discard) {
             // Signal server to finalize
             api('POST', '/api/sessions/' + state.sessionId + '/end', {
                 mime_type: state.mimeType
+            }).then(function() {
+                showSaveConfirmation();
             }).catch(function(e) {
                 console.error('end session failed:', e);
             });
@@ -475,6 +508,19 @@ function showError(id, msg) {
 
 function hideError(id) {
     document.getElementById(id).classList.add('hidden');
+}
+
+function showSaveConfirmation() {
+    var toast = document.createElement('div');
+    toast.className = 'save-toast';
+    toast.textContent = 'FOOTAGE SAVED \u2713';
+    document.body.appendChild(toast);
+    setTimeout(function() {
+        toast.classList.add('fade-out');
+        setTimeout(function() {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 500);
+    }, 2500);
 }
 
 // ==================== Event Listeners ====================

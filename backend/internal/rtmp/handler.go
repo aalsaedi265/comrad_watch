@@ -41,7 +41,7 @@ func (h *connHandler) OnPublish(_ *rtmp.StreamContext, timestamp uint32, cmd *rt
 		return fmt.Errorf("empty stream key")
 	}
 
-	log.Printf("publish request: key=%s", h.streamKey)
+	log.Printf("publish request: key=%.8s...", h.streamKey)
 
 	if err := h.server.registerStream(h.streamKey); err != nil {
 		return fmt.Errorf("register stream: %w", err)
@@ -110,7 +110,7 @@ func (h *connHandler) OnVideo(timestamp uint32, payload io.Reader) error {
 }
 
 func (h *connHandler) OnClose() {
-	log.Printf("RTMP client disconnected: key=%s", h.streamKey)
+	log.Printf("RTMP client disconnected: key=%.8s...", h.streamKey)
 	if h.streamKey != "" {
 		h.server.onDisconnect(h.streamKey, "disconnect")
 	}
