@@ -46,6 +46,7 @@ type activeStream struct {
 	startedAt  time.Time
 	lastSync   time.Time
 	cancel     context.CancelFunc
+	writeMu    sync.Mutex // protects flvEncoder writes
 }
 
 func NewServer(cfg *config.Config, queries *db.Queries) *Server {
@@ -146,7 +147,7 @@ func (s *Server) registerStream(streamKey string) error {
 	s.streams[streamKey] = stream
 	s.mu.Unlock()
 
-	log.Printf("stream registered: key=%s session=%s path=%s", streamKey, session.ID, flvPath)
+	log.Printf("stream registered: key=%.8s... session=%s path=%s", streamKey, session.ID, flvPath)
 	return nil
 }
 
@@ -163,6 +164,10 @@ func (s *Server) writeData(streamKey string, tag *flvtag.FlvTag) error {
 	if stream.flvEncoder == nil {
 		return fmt.Errorf("encoder not initialized for stream: %s", streamKey)
 	}
+
+	// Per-stream mutex protects concurrent audio/video writes
+	stream.writeMu.Lock()
+	defer stream.writeMu.Unlock()
 
 	if err := stream.flvEncoder.Encode(tag); err != nil {
 		return fmt.Errorf("encode FLV tag: %w", err)
@@ -195,7 +200,7 @@ func (s *Server) onDisconnect(streamKey string, reason string) {
 // finalizeStream closes the FLV file, updates DB, and starts post-processing.
 func (s *Server) finalizeStream(streamKey string, stream *activeStream, reason string) {
 	duration := int(time.Since(stream.startedAt).Seconds())
-	log.Printf("finalizing stream: key=%s reason=%s duration=%ds", streamKey, reason, duration)
+	log.Printf("finalizing stream: key=%.8s... reason=%s duration=%ds", streamKey, reason, duration)
 
 	// Close FLV file
 	if stream.flvFile != nil {
@@ -272,48 +277,53 @@ func (s *Server) postProcess(sessionID, userID uuid.UUID, streamKey string) {
 	log.Printf("MP4 ready: %s", mp4Path)
 
 	// Upload to Google Drive (if user has connected)
-	s.uploadToGoogleDrive(sessionID, userID, mp4Path)
+	driveOk := s.uploadToGoogleDrive(sessionID, userID, mp4Path)
 
 	// Post to Instagram Story (if user has connected Instagram)
-	s.postToInstagram(sessionID, userID, streamKey)
+	igOk := s.postToInstagram(sessionID, userID, streamKey)
 
-	s.queries.UpdateSessionStatus(context.Background(), sessionID, "uploaded")
-	log.Printf("post-processing complete for session %s", sessionID)
+	status := "processed"
+	if driveOk || igOk {
+		status = "uploaded"
+	}
+	s.queries.UpdateSessionStatus(context.Background(), sessionID, status)
+	log.Printf("post-processing complete for session %s (status=%s)", sessionID, status)
 }
 
 // uploadToGoogleDrive uploads the MP4 to the user's Google Drive if connected.
-func (s *Server) uploadToGoogleDrive(sessionID, userID uuid.UUID, mp4Path string) {
+// Returns true if upload succeeded, false if skipped or failed.
+func (s *Server) uploadToGoogleDrive(sessionID, userID uuid.UUID, mp4Path string) bool {
 	ctx := context.Background()
 
 	// Check if Google Drive is configured at the server level
 	if s.cfg.GoogleClientID == "" || s.cfg.GoogleClientSecret == "" {
 		log.Printf("gdrive: skipping (not configured)")
-		return
+		return false
 	}
 
 	// Check if user has connected Google Drive
 	encryptedToken, err := s.queries.GetUserGoogleToken(ctx, userID)
 	if err != nil {
 		log.Printf("gdrive: error checking user token: %v", err)
-		return
+		return false
 	}
 	if encryptedToken == nil || *encryptedToken == "" {
 		log.Printf("gdrive: skipping for session %s (user has no Google Drive connected)", sessionID)
-		return
+		return false
 	}
 
 	// Decrypt the token JSON
 	tokenJSON, err := crypto.Decrypt(*encryptedToken, s.cfg.EncryptionKey)
 	if err != nil {
 		log.Printf("gdrive: failed to decrypt token for user %s: %v", userID, err)
-		return
+		return false
 	}
 
 	// Unmarshal the OAuth token
 	token, err := gdrive.UnmarshalToken(tokenJSON)
 	if err != nil {
 		log.Printf("gdrive: failed to unmarshal token for user %s: %v", userID, err)
-		return
+		return false
 	}
 
 	// Upload
@@ -323,7 +333,7 @@ func (s *Server) uploadToGoogleDrive(sessionID, userID uuid.UUID, mp4Path string
 	fileID, err := uploader.Upload(ctx, token, mp4Path)
 	if err != nil {
 		log.Printf("gdrive: upload failed for session %s: %v", sessionID, err)
-		return
+		return false
 	}
 
 	// Record the Drive file ID
@@ -332,35 +342,37 @@ func (s *Server) uploadToGoogleDrive(sessionID, userID uuid.UUID, mp4Path string
 	}
 
 	log.Printf("gdrive: uploaded session %s to Google Drive (file ID: %s)", sessionID, fileID)
+	return true
 }
 
 // postToInstagram checks if the user has connected Instagram, and if so
 // publishes the session's MP4 as an Instagram Story.
-func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) {
+// Returns true if story was posted successfully, false if skipped or failed.
+func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) bool {
 	ctx := context.Background()
 
 	// Check if Instagram is configured at the server level
 	if s.cfg.InstagramAppID == "" || s.cfg.InstagramAppSecret == "" {
 		log.Printf("instagram: skipping (app not configured)")
-		return
+		return false
 	}
 
 	// Check if user has connected their Instagram account
 	encryptedToken, accountID, err := s.queries.GetUserInstagramToken(ctx, userID)
 	if err != nil {
 		log.Printf("instagram: error checking user token: %v", err)
-		return
+		return false
 	}
 	if encryptedToken == nil || *encryptedToken == "" || accountID == nil {
 		log.Printf("instagram: skipping for session %s (user has no Instagram connected)", sessionID)
-		return
+		return false
 	}
 
 	// Decrypt the access token
 	accessToken, err := crypto.Decrypt(*encryptedToken, s.cfg.EncryptionKey)
 	if err != nil {
 		log.Printf("instagram: failed to decrypt token for user %s: %v", userID, err)
-		return
+		return false
 	}
 
 	// Build the public video URL that Instagram can fetch.
@@ -373,7 +385,7 @@ func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) 
 	storyID, err := s.ig.PostStory(ctx, accessToken, *accountID, videoURL)
 	if err != nil {
 		log.Printf("instagram: failed to post story for session %s: %v", sessionID, err)
-		return
+		return false
 	}
 
 	// Record the story ID in the database
@@ -382,6 +394,7 @@ func (s *Server) postToInstagram(sessionID, userID uuid.UUID, streamKey string) 
 	}
 
 	log.Printf("instagram: story posted successfully for session %s (story ID: %s)", sessionID, storyID)
+	return true
 }
 
 // PostProcessWebSession is called by the API layer when a PWA recording ends.
@@ -428,9 +441,13 @@ func (s *Server) postProcessWeb(sessionID, userID uuid.UUID, streamKey, rawPath,
 	log.Printf("MP4 ready (web): %s", mp4Path)
 
 	// Reuse existing upload functions
-	s.uploadToGoogleDrive(sessionID, userID, mp4Path)
-	s.postToInstagram(sessionID, userID, streamKey)
+	driveOk := s.uploadToGoogleDrive(sessionID, userID, mp4Path)
+	igOk := s.postToInstagram(sessionID, userID, streamKey)
 
-	s.queries.UpdateSessionStatus(context.Background(), sessionID, "uploaded")
-	log.Printf("post-processing complete for web session %s", sessionID)
+	status := "processed"
+	if driveOk || igOk {
+		status = "uploaded"
+	}
+	s.queries.UpdateSessionStatus(context.Background(), sessionID, status)
+	log.Printf("post-processing complete for web session %s (status=%s)", sessionID, status)
 }

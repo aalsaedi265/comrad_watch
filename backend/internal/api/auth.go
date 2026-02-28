@@ -41,6 +41,7 @@ type userResponse struct {
 }
 
 func (h *authHandler) Register(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4096) // 4KB limit
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -97,6 +98,7 @@ func (h *authHandler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4096) // 4KB limit
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -142,7 +144,7 @@ const userIDKey contextKey = "userID"
 func generateToken(secret string, userID uuid.UUID) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": userID.String(),
-		"exp": time.Now().Add(30 * 24 * time.Hour).Unix(), // 30 days
+		"exp": time.Now().Add(7 * 24 * time.Hour).Unix(), // 7 days
 		"iat": time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -198,7 +200,11 @@ func requireAuth(cfg *config.Config, next http.HandlerFunc) http.HandlerFunc {
 }
 
 func getUserID(r *http.Request) uuid.UUID {
-	return r.Context().Value(userIDKey).(uuid.UUID)
+	uid, ok := r.Context().Value(userIDKey).(uuid.UUID)
+	if !ok {
+		return uuid.Nil
+	}
+	return uid
 }
 
 // --- Response helpers ---

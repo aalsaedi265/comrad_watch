@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -60,8 +62,13 @@ func Load() (*Config, error) {
 	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET is required")
 	}
-	if cfg.GoogleClientID != "" && cfg.EncryptionKey == "" {
-		return nil, fmt.Errorf("ENCRYPTION_KEY is required when Google Drive is configured")
+	if (cfg.GoogleClientID != "" || cfg.InstagramAppID != "") && cfg.EncryptionKey == "" {
+		return nil, fmt.Errorf("ENCRYPTION_KEY is required when Google Drive or Instagram is configured")
+	}
+
+	// Warn if Google redirect URI uses HTTP in production
+	if cfg.GoogleRedirectURI != "" && !strings.HasPrefix(cfg.GoogleRedirectURI, "https://") && cfg.PublicHost != "localhost" {
+		log.Printf("WARNING: GOOGLE_REDIRECT_URI uses HTTP — use HTTPS in production")
 	}
 
 	return cfg, nil

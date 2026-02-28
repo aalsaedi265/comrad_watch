@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -52,21 +53,24 @@ func (h *instagramHandler) ConnectInstagram(w http.ResponseWriter, r *http.Reque
 	// Step 1: Exchange auth code for short-lived token
 	shortToken, err := h.ig.ExchangeCode(ctx, req.Code, req.RedirectURI)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "failed to exchange code: "+err.Error())
+		log.Printf("instagram: failed to exchange code: %v", err)
+		writeError(w, http.StatusBadGateway, "failed to connect Instagram")
 		return
 	}
 
 	// Step 2: Exchange for long-lived token (~60 days)
 	longToken, err := h.ig.ExchangeLongLived(ctx, shortToken.AccessToken)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "failed to get long-lived token: "+err.Error())
+		log.Printf("instagram: failed to get long-lived token: %v", err)
+		writeError(w, http.StatusBadGateway, "failed to connect Instagram")
 		return
 	}
 
 	// Step 3: Get the user's Instagram account info
 	userInfo, err := h.ig.GetUserInfo(ctx, longToken.AccessToken)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "failed to get user info: "+err.Error())
+		log.Printf("instagram: failed to get user info: %v", err)
+		writeError(w, http.StatusBadGateway, "failed to connect Instagram")
 		return
 	}
 

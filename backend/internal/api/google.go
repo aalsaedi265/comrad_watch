@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -82,7 +82,8 @@ func (h *googleHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	token, err := gdrive.ExchangeCode(ctx, oauthCfg, code)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to exchange code: %v", err), http.StatusInternalServerError)
+		log.Printf("gdrive: failed to exchange code: %v", err)
+		http.Error(w, "Failed to connect Google Drive", http.StatusInternalServerError)
 		return
 	}
 

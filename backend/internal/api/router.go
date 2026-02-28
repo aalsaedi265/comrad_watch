@@ -1,7 +1,11 @@
 package api
 
 import (
+	"log"
 	"net/http"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/comradwatch/backend/internal/config"
 	"github.com/comradwatch/backend/internal/db"
@@ -21,9 +25,10 @@ func NewRouter(cfg *config.Config, queries *db.Queries, rtmpSrv *rtmp.Server) ht
 		ig:      instagram.NewClient(cfg.InstagramAppID, cfg.InstagramAppSecret),
 	}
 
-	// Public routes
-	mux.HandleFunc("POST /api/register", auth.Register)
-	mux.HandleFunc("POST /api/login", auth.Login)
+	// Public routes (rate limited: 10 attempts per minute per IP)
+	authLimiter := newRateLimiter(10, time.Minute)
+	mux.HandleFunc("POST /api/register", authLimiter.wrap(auth.Register))
+	mux.HandleFunc("POST /api/login", authLimiter.wrap(auth.Login))
 
 	// Health check
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -65,14 +70,105 @@ func NewRouter(cfg *config.Config, queries *db.Queries, rtmpSrv *rtmp.Server) ht
 	// API routes take priority (more specific patterns win in Go 1.22+ mux)
 	mux.Handle("/", http.FileServer(http.Dir("web")))
 
-	return withCORS(mux)
+	return withLogging(withSecurityHeaders(mux))
 }
 
-func withCORS(next http.Handler) http.Handler {
+// --- Rate Limiter (in-memory, per-IP) ---
+
+type rateLimiter struct {
+	mu      sync.Mutex
+	clients map[string]*clientRate
+	limit   int
+	window  time.Duration
+}
+
+type clientRate struct {
+	count   int
+	resetAt time.Time
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{
+		clients: make(map[string]*clientRate),
+		limit:   limit,
+		window:  window,
+	}
+}
+
+func (rl *rateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	client, ok := rl.clients[ip]
+	if !ok || now.After(client.resetAt) {
+		rl.clients[ip] = &clientRate{count: 1, resetAt: now.Add(rl.window)}
+		return true
+	}
+	client.count++
+	return client.count <= rl.limit
+}
+
+func (rl *rateLimiter) wrap(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip := r.RemoteAddr
+		if i := strings.LastIndex(ip, ":"); i > 0 {
+			ip = ip[:i]
+		}
+		if !rl.allow(ip) {
+			writeError(w, http.StatusTooManyRequests, "too many requests, try again later")
+			return
+		}
+		next(w, r)
+	}
+}
+
+// --- Request Logging ---
+
+type statusWriter struct {
+	http.ResponseWriter
+	status  int
+	written bool
+}
+
+func (sw *statusWriter) WriteHeader(code int) {
+	if !sw.written {
+		sw.status = code
+		sw.written = true
+	}
+	sw.ResponseWriter.WriteHeader(code)
+}
+
+func withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		start := time.Now()
+		sw := &statusWriter{ResponseWriter: w, status: 200}
+		next.ServeHTTP(sw, r)
+		log.Printf("%s %s %d %s", r.Method, r.URL.Path, sw.status, time.Since(start).Round(time.Millisecond))
+	})
+}
+
+// --- Security Headers ---
+
+func withSecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// CORS — reflect request origin instead of wildcard
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		}
+
+		// Content Security Policy
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self'; "+
+				"style-src 'self' https://fonts.googleapis.com; "+
+				"font-src 'self' https://fonts.gstatic.com; "+
+				"img-src 'self' data:; "+
+				"connect-src 'self'")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
