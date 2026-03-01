@@ -130,8 +130,6 @@ func (s *Server) registerStream(streamKey string) error {
 		return fmt.Errorf("create FLV encoder: %w", err)
 	}
 
-	_, cancel := context.WithCancel(context.Background())
-
 	stream := &activeStream{
 		sessionID:  session.ID,
 		userID:     session.UserID,
@@ -140,7 +138,7 @@ func (s *Server) registerStream(streamKey string) error {
 		flvEncoder: enc,
 		startedAt:  time.Now(),
 		lastSync:   time.Now(),
-		cancel:     cancel,
+		cancel:     func() {},
 	}
 
 	s.mu.Lock()

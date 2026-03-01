@@ -37,6 +37,7 @@ type connectInstagramResponse struct {
 func (h *instagramHandler) ConnectInstagram(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	var req connectInstagramRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")

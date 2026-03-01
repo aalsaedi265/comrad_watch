@@ -9,7 +9,7 @@ One-tap video recording for activists. Your phone streams to a remote server in 
 | Tool | Required For | Install |
 |------|-------------|---------|
 | **Docker + Docker Compose** | Running everything (server + database) | [docker.com](https://docs.docker.com/get-docker/) |
-| **Go 1.24+** | Only if running backend without Docker | [go.dev](https://go.dev/dl/) |
+| **Go 1.25+** | Only if running backend without Docker | [go.dev](https://go.dev/dl/) |
 | **Android Studio + JDK 17** | Only if building the Android app | [developer.android.com](https://developer.android.com/studio) + [adoptium.net](https://adoptium.net/) |
 | **FFmpeg** | Included in Docker image. Manual install only if running without Docker | [ffmpeg.org](https://ffmpeg.org/download.html) |
 
@@ -141,7 +141,17 @@ If you prefer running the Go backend directly:
 
 ### 1. Install and start PostgreSQL
 
-Make sure PostgreSQL is running with a database called `comradwatch`.
+Install and start PostgreSQL, then create the database (the server does not create it automatically):
+
+```bash
+createdb comradwatch
+```
+
+If `createdb` isn't on your PATH, use `psql`:
+
+```bash
+psql -U postgres -c "CREATE DATABASE comradwatch;"
+```
 
 ### 2. Configure environment
 
