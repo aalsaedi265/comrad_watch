@@ -62,7 +62,7 @@ Phone seizure and destruction during documentation is increasing globally. Curre
 - OAuth tokens stored with AES-256 encryption at rest
 - No third-party analytics or tracking
 - Server can be self-hosted by organizations who need full control
-- Stream keys are single-use and expire after the session
+- Stream keys are unique per session and never reused
 
 ## Technical Architecture (High Level)
 

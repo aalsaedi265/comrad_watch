@@ -100,8 +100,16 @@ func (rl *rateLimiter) allow(ip string) bool {
 	defer rl.mu.Unlock()
 
 	now := time.Now()
+
+	// Evict expired entries on every check to bound memory usage.
+	for k, v := range rl.clients {
+		if now.After(v.resetAt) {
+			delete(rl.clients, k)
+		}
+	}
+
 	client, ok := rl.clients[ip]
-	if !ok || now.After(client.resetAt) {
+	if !ok {
 		rl.clients[ip] = &clientRate{count: 1, resetAt: now.Add(rl.window)}
 		return true
 	}

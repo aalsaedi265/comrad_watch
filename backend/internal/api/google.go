@@ -64,6 +64,7 @@ func (h *googleHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	// Decrypt the state to get the user ID
 	userIDStr, err := crypto.Decrypt(state, h.cfg.EncryptionKey)
 	if err != nil {
+		log.Printf("google: failed to decrypt oauth state (possible key mismatch): %v", err)
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
 		return
 	}
