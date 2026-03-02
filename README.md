@@ -4,69 +4,31 @@ One-tap video recording for activists. Your phone streams to a remote server in 
 
 ---
 
-## What You Need
+## Quick Start
 
-| Tool | Required For | Install |
-|------|-------------|---------|
-| **Docker + Docker Compose** | Running everything (server + database) | [docker.com](https://docs.docker.com/get-docker/) |
-| **Go 1.25+** | Only if running backend without Docker | [go.dev](https://go.dev/dl/) |
-| **Android Studio + JDK 17** | Only if building the Android app | [developer.android.com](https://developer.android.com/studio) + [adoptium.net](https://adoptium.net/) |
-| **FFmpeg** | Included in Docker image. Manual install only if running without Docker | [ffmpeg.org](https://ffmpeg.org/download.html) |
-
----
-
-## Getting Started (Docker — Recommended)
-
-### Step 1: Clone and configure
+**Use Docker.** It handles the database, FFmpeg, and all configuration. Running without Docker means installing PostgreSQL, Go, and FFmpeg yourself — it's an uphill battle and highly unrecommended.
 
 ```bash
 git clone https://github.com/aalsaedi265/comrad_watch.git
 cd comrad_watch
-
-# Create your env file from the template
-cp backend/.env.example backend/.env
-```
-
-Open `backend/.env` and set these values:
-
-```env
-# REQUIRED — change these from the defaults
-JWT_SECRET=some-long-random-string-here
-ENCRYPTION_KEY=another-long-random-string-here
-
-# OPTIONAL — only needed if you want Google Drive backup
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:8080/api/google/callback
-
-# OPTIONAL — only needed if you want Instagram Story auto-post
-INSTAGRAM_APP_ID=your-ig-app-id
-INSTAGRAM_APP_SECRET=your-ig-app-secret
-```
-
-### Step 2: Start the server
-
-```bash
 docker compose up --build
 ```
 
-This starts:
-- **PostgreSQL** database on port 5432
-- **REST API + PWA** on port 8080
-- **RTMP ingest** on port 1935 (for Android app streaming)
+Open **http://localhost:8080** — register an account and start recording. That's it.
 
-The database schema is created automatically on first run.
+---
 
-### Step 3: Verify it works
+## What's Running
 
-Open your browser to **http://localhost:8080** — you should see the login screen.
+When you run `docker compose up --build`, three things start:
 
-Or test from the command line:
+| Service | Port | What It Does |
+|---------|------|-------------|
+| **PostgreSQL** | 5432 | Stores user accounts, session metadata |
+| **REST API + Web App** | 8080 | Serves the PWA and handles video uploads |
+| **RTMP Ingest** | 1935 | Receives live video from the Android app |
 
-```bash
-curl http://localhost:8080/api/health
-# → {"status":"ok"}
-```
+The database schema is created automatically on first run. No manual SQL needed.
 
 ---
 
@@ -86,24 +48,20 @@ The web app works on any phone or computer with a modern browser. This is the fa
 ### Save to home screen (acts like a native app):
 
 **iPhone (Safari):**
-1. Open the web app in Safari
-2. Tap the Share button (square with arrow)
-3. Scroll down and tap **Add to Home Screen**
-4. Tap **Add** — the Comrad Watch icon appears on your home screen
-5. Now tap the icon to launch it fullscreen, just like a real app
+1. Tap the Share button (square with arrow)
+2. Tap **Add to Home Screen** → **Add**
+3. Launch it from your home screen — runs fullscreen like a native app
 
 **Android (Chrome):**
-1. Open the web app in Chrome
-2. Tap the three-dot menu (top right)
-3. Tap **Add to Home screen** (or **Install app**)
-4. Tap **Add** — the icon appears on your home screen
+1. Tap the three-dot menu → **Add to Home screen** (or **Install app**)
+2. Launch it from your home screen
 
 ### Connect Google Drive (optional):
 
-1. Tap the gear icon to open Settings
+1. Tap the gear icon → Settings
 2. Tap **Connect Google Drive**
-3. Sign in with your Google account and allow access
-4. All future recordings are automatically saved to your Drive in `ComradWatch/` folder
+3. Sign in and allow access
+4. All future recordings are automatically saved to your Drive
 
 ### Connect Instagram (optional):
 
@@ -122,7 +80,7 @@ The native Android app streams video via RTMP for better quality and background 
 1. Install **JDK 17+** from [adoptium.net](https://adoptium.net/)
 2. Open the `mobile/` folder in Android Studio
 3. Wait for Gradle sync to finish
-4. Click **Run** (green play button) to install on a connected device or emulator
+4. Click **Run** to install on a device or emulator
 
 ### First launch:
 
@@ -135,55 +93,121 @@ The native Android app streams video via RTMP for better quality and background 
 
 ---
 
-## Running Without Docker
+## Deploying to Production
 
-If you prefer running the Go backend directly:
+Production requires HTTPS — browsers block camera and microphone access on plain HTTP. The production setup includes [Caddy](https://caddyserver.com/) which handles HTTPS certificates automatically via Let's Encrypt.
 
-### 1. Install and start PostgreSQL
+### Step 1: Get a server
 
-Install and start PostgreSQL, then create the database (the server does not create it automatically):
+Any VPS with Docker works (DigitalOcean, Linode, Hetzner, etc.). Minimum: 1 CPU, 1 GB RAM.
 
-```bash
-createdb comradwatch
-```
+### Step 2: Point your domain
 
-If `createdb` isn't on your PATH, use `psql`:
+Set an **A record** for your domain (e.g., `comradwatch.org`) pointing to your server's IP address. Wait for DNS to propagate.
 
-```bash
-psql -U postgres -c "CREATE DATABASE comradwatch;"
-```
-
-### 2. Configure environment
+### Step 3: Clone and configure
 
 ```bash
-cd backend
-cp .env.example .env
+git clone https://github.com/aalsaedi265/comrad_watch.git
+cd comrad_watch
+./deploy.sh
 ```
 
-Edit `.env` and set `DATABASE_URL` to your PostgreSQL connection string:
+The deploy script will:
+- Ask for your domain name
+- Generate strong random secrets (JWT, encryption keys, database password)
+- Optionally configure Google Drive and Instagram credentials
+- Write everything to `backend/.env` and `.env`
 
-```env
-DATABASE_URL=postgres://youruser:yourpass@localhost:5432/comradwatch?sslmode=disable
-JWT_SECRET=some-long-random-string
-ENCRYPTION_KEY=another-long-random-string
-```
-
-### 3. Run the server
+### Step 4: Start the server
 
 ```bash
-cd backend
-go run ./cmd/server
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-The server starts on port 8080 (HTTP) and 1935 (RTMP).
+Caddy automatically gets an HTTPS certificate from Let's Encrypt. Your app is live at `https://your-domain.com`.
 
-### 4. Install FFmpeg
+### Step 5: Open firewall ports
 
-FFmpeg is needed for converting recordings to MP4. Install it for your OS:
+Make sure these ports are open:
 
-- **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
-- **Mac**: `brew install ffmpeg`
-- **Linux**: `sudo apt install ffmpeg`
+| Port | Protocol | Required For |
+|------|----------|-------------|
+| 80 | TCP | HTTP → HTTPS redirect |
+| 443 | TCP | HTTPS (web app + API) |
+| 1935 | TCP | RTMP (Android app streaming) |
+
+### Google Drive setup (optional):
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create an OAuth 2.0 Client ID (Web application)
+3. Set authorized redirect URI to `https://your-domain.com/api/google/callback`
+4. Copy the Client ID and Client Secret into `backend/.env`
+
+### Instagram setup (optional):
+
+1. Go to [Meta Developer Console](https://developers.facebook.com/)
+2. Create an app with Instagram Basic Display
+3. Copy the App ID and App Secret into `backend/.env`
+
+### Monitoring:
+
+```bash
+# View logs
+docker compose -f docker-compose.prod.yml logs -f
+
+# Check if everything is running
+docker compose -f docker-compose.prod.yml ps
+
+# Restart after config changes
+docker compose -f docker-compose.prod.yml up -d
+```
+
+---
+
+## Running Without Docker (Not Recommended)
+
+> **Seriously, use Docker.** The instructions below require you to install and manage PostgreSQL, Go 1.25+, and FFmpeg yourself. If any of these are missing or misconfigured, things will break in confusing ways. Docker handles all of this for you with a single command.
+
+If you still want to run the Go backend directly:
+
+### Using the setup script:
+
+```bash
+# Linux/Mac
+./setup.sh
+cd backend && go run ./cmd/server
+
+# Windows
+setup.bat
+cd backend && go run .\cmd\server
+```
+
+The setup script generates `backend/.env` with random secrets and starts PostgreSQL via Docker (you still need Docker for the database, at minimum).
+
+### Fully manual setup:
+
+1. Install and start PostgreSQL, then create the database:
+   ```bash
+   createdb comradwatch
+   ```
+
+2. Create and configure the env file:
+   ```bash
+   cd backend
+   cp .env.example .env
+   # Edit .env — set DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY
+   ```
+
+3. Install FFmpeg:
+   - **Mac**: `brew install ffmpeg`
+   - **Linux**: `sudo apt install ffmpeg`
+   - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
+
+4. Run the server:
+   ```bash
+   go run ./cmd/server
+   ```
 
 ---
 
@@ -213,14 +237,6 @@ Press Ctrl+C to stop. The server automatically converts the FLV to MP4.
 
 ---
 
-## Ports
-
-| Port | Service |
-|------|---------|
-| 8080 | HTTP API + Web App |
-| 1935 | RTMP video ingest (Android app) |
-| 5432 | PostgreSQL (Docker only) |
-
 ## Project Structure
 
 ```
@@ -228,18 +244,24 @@ comrad_watch/
   backend/
     cmd/server/       # Entry point
     internal/
-      api/            # REST API handlers
+      api/            # REST API handlers + middleware
       rtmp/           # RTMP video ingest + post-processing
-      db/             # Database queries + migrations
+      db/             # Database connection + migrations
       config/         # Environment config
-      crypto/         # AES-256 encryption
-      gdrive/         # Google Drive integration
-      instagram/      # Instagram Story integration
+      crypto/         # AES-256 encryption for OAuth tokens
+      gdrive/         # Google Drive upload
+      instagram/      # Instagram Story posting
     web/              # PWA frontend (HTML/CSS/JS)
-    migrations/       # SQL schema files
+    migrations/       # SQL schema
   mobile/
     shared/           # Kotlin shared code (API client)
     androidApp/       # Android native app
+  setup.sh            # Local dev setup (Linux/Mac)
+  setup.bat           # Local dev setup (Windows)
+  deploy.sh           # Production setup
+  docker-compose.yml          # Dev (local)
+  docker-compose.prod.yml     # Production (HTTPS + Caddy)
+  Caddyfile                   # Reverse proxy config
 ```
 
 ## Status

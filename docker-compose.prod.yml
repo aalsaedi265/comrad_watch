@@ -1,0 +1,60 @@
+# Production compose — run with: docker compose -f docker-compose.prod.yml up -d
+#
+# Before running, generate .env with deploy.sh:
+#   ./deploy.sh
+#
+# Includes Caddy for automatic HTTPS (Let's Encrypt).
+# Browsers require HTTPS for camera/mic access, so this is NOT optional.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: comradwatch
+      POSTGRES_USER: comradwatch
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  server:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "1935:1935" # RTMP — raw TCP, not proxied through Caddy
+    environment:
+      DATABASE_URL: postgres://comradwatch:${DB_PASSWORD}@db:5432/comradwatch?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SEGMENT_DIR: /app/segments
+      HTTP_PORT: "8080"
+      RTMP_PORT: "1935"
+      PUBLIC_HOST: ${DOMAIN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-https://${DOMAIN}/api/google/callback}
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID:-}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
+    depends_on:
+      - db
+    volumes:
+      - segments:/app/segments
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"   # HTTP → redirects to HTTPS
+      - "443:443" # HTTPS — auto-TLS via Let's Encrypt
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  segments:
+  caddy_data:
+  caddy_config:
