@@ -30,7 +30,29 @@ When you run `docker compose up --build`, three things start:
 
 The database schema is created automatically on first run. No manual SQL needed.
 
+
+## Using the Android App
+
+The native Android app streams video via RTMP for better quality and background recording support.
+
+### Build from source:
+
+1. Install **JDK 17+** from [adoptium.net](https://adoptium.net/)
+2. Open the `mobile/` folder in Android Studio
+3. Wait for Gradle sync to finish
+4. Click **Run** to install on a device or emulator
+
+### First launch:
+
+1. Enter the server URL:
+   - **Emulator**: `http://10.0.2.2:8080`
+   - **Physical device on same WiFi**: `http://your-computer-ip:8080`
+2. Register or log in
+3. Grant camera + microphone permissions
+4. Tap the red button — streaming starts immediately
+
 ---
+
 
 ## Using the Web App (PWA)
 
@@ -71,27 +93,6 @@ The web app works on any phone or computer with a modern browser. This is the fa
 
 ---
 
-## Using the Android App
-
-The native Android app streams video via RTMP for better quality and background recording support.
-
-### Build from source:
-
-1. Install **JDK 17+** from [adoptium.net](https://adoptium.net/)
-2. Open the `mobile/` folder in Android Studio
-3. Wait for Gradle sync to finish
-4. Click **Run** to install on a device or emulator
-
-### First launch:
-
-1. Enter the server URL:
-   - **Emulator**: `http://10.0.2.2:8080`
-   - **Physical device on same WiFi**: `http://your-computer-ip:8080`
-2. Register or log in
-3. Grant camera + microphone permissions
-4. Tap the red button — streaming starts immediately
-
----
 
 ## Deploying to Production
 

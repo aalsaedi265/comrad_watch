@@ -1,31 +1,28 @@
 /*
  * ████████████████████████████████████████████████████████
- *  COMRAD WATCH — CONSTRUCTIVIST UI
- *  Inspired by Russian Constructivism & Soviet poster design
+ *  COMRAD WATCH — BRUTALIST COMMUNIST UI
  *
- *  Palette : Near-Black · Soviet Red · Warm Cream
+ *  Palette : Soviet Red · Pure White · Near-Black
  *  Type    : Anton (display) · IBM Plex Mono (body)
- *  Rules   : Zero border-radius. Angular. Bold horizontals.
- *            Red as power, not decoration.
+ *  Rules   : Zero border-radius. Hard edges. Bold geometry.
+ *            Red dominates. White shouts. No gray. No soft.
+ *            Visible in sunlight. Visible at night.
  * ████████████████████████████████████████████████████████
  */
 
 :root {
-    --black:      #080808;
-    --surface:    #111111;
-    --surface-2:  #1C1C1C;
-    --red:        #C8000A;   /* Soviet red — deep, authoritative */
-    --red-hot:    #FF1A00;   /* active / pressed */
-    --red-fade:   rgba(200, 0, 10, 0.12);
-    --white:      #EDE8DF;   /* warm cream — aged propaganda paper */
-    --white-dim:  #65605A;   /* muted secondary text */
-    --rule:       #242424;   /* divider lines */
+    --red:        #CC0000;
+    --red-hot:    #E00000;
+    --white:      #FFFFFF;
+    --black:      #0A0A0A;
 
     --font-display: 'Anton', sans-serif;
     --font-body:    'IBM Plex Mono', 'Courier New', monospace;
 
     --safe-top:    env(safe-area-inset-top,    0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left:   env(safe-area-inset-left,   0px);
+    --safe-right:  env(safe-area-inset-right,  0px);
 }
 
 /* ══════════════════════════════════════════
@@ -42,8 +39,8 @@
 html, body {
     height: 100%;
     overflow: hidden;
-    background: var(--black);
-    color: var(--white);
+    background: var(--white);
+    color: var(--black);
     font-family: var(--font-body);
     font-size: 13px;
     -webkit-text-size-adjust: 100%;
@@ -66,24 +63,24 @@ html, body {
     inset: 0;
     display: flex;
     flex-direction: column;
-    background: var(--black);
+    background: var(--white);
     overflow: hidden;
 }
 
 /* ══════════════════════════════════════════
-   SHARED: BOLD HORIZONTAL RULES
+   BOLD RULES — structural dividers
 ══════════════════════════════════════════ */
 
 .auth-rule,
 .main-rule,
 .settings-rule {
-    height: 3px;
-    background: var(--red);
+    height: 4px;
+    background: var(--black);
     flex-shrink: 0;
 }
 
 /* ══════════════════════════════════════════
-   SHARED: BUTTONS
+   BUTTONS
 ══════════════════════════════════════════ */
 
 button {
@@ -99,12 +96,12 @@ button {
 .btn-primary {
     display: block;
     width: 100%;
-    padding: 17px 20px;
+    padding: 18px 20px;
     background: var(--red);
     border: none;
     color: var(--white);
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: 24px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     text-align: center;
@@ -112,63 +109,64 @@ button {
 }
 .btn-primary:active { background: var(--red-hot); }
 
-/* Secondary — outline */
+/* Secondary — heavy black outline on white */
 .btn-secondary {
     display: block;
     width: 100%;
-    padding: 15px 20px;
-    background: transparent;
-    border: 2px solid var(--white-dim);
-    color: var(--white);
+    padding: 16px 20px;
+    background: var(--white);
+    border: 3px solid var(--black);
+    color: var(--black);
     font-family: var(--font-display);
     font-size: 22px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     text-align: center;
-    transition: border-color 0.1s;
+    transition: background 0.1s, color 0.1s;
 }
-.btn-secondary:active { border-color: var(--white); }
+.btn-secondary:active { background: var(--black); color: var(--white); }
 
-/* Ghost — minimal */
+/* Ghost — minimal text */
 .btn-ghost {
     display: block;
     width: 100%;
     background: none;
     border: none;
-    color: var(--white-dim);
+    color: var(--black);
     font-family: var(--font-body);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.14em;
     padding: 12px;
     text-align: center;
-    transition: color 0.1s;
+    opacity: 0.5;
+    transition: opacity 0.1s;
 }
-.btn-ghost:active { color: var(--white); }
-.btn-ghost.danger { color: var(--red);   }
+.btn-ghost:active  { opacity: 1; }
+.btn-ghost.danger  { color: var(--red); opacity: 1; }
 
 /* Danger — red outline */
 .btn-danger {
     display: block;
     width: 100%;
-    padding: 13px 20px;
+    padding: 14px 20px;
     background: transparent;
-    border: 2px solid rgba(200, 0, 10, 0.4);
-    color: var(--red-hot);
+    border: 2px solid var(--red);
+    color: var(--red);
     font-family: var(--font-body);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.14em;
     text-align: center;
-    transition: border-color 0.1s;
+    transition: background 0.1s, color 0.1s;
 }
-.btn-danger:active { border-color: var(--red-hot); }
+.btn-danger:active { background: var(--red); color: var(--white); }
 
-/* Instagram — gradient brand colour */
+/* Instagram — gradient */
 .btn-ig {
     display: block;
     width: 100%;
-    padding: 15px 20px;
+    padding: 16px 20px;
     background: linear-gradient(90deg, #405DE6, #C13584, #FD1D1D);
     border: none;
     color: var(--white);
@@ -180,23 +178,20 @@ button {
 }
 .btn-ig:active { opacity: 0.85; }
 
-/* Compact header button */
+/* Header button — white border/text on red backgrounds */
 .icon-btn {
     background: transparent;
-    border: 1.5px solid var(--rule);
-    color: var(--white-dim);
+    border: 2px solid var(--white);
+    color: var(--white);
     font-family: var(--font-body);
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    padding: 5px 11px;
-    transition: border-color 0.1s, color 0.1s;
+    padding: 6px 12px;
     white-space: nowrap;
+    transition: background 0.1s, color 0.1s;
 }
-.icon-btn:active {
-    border-color: var(--white-dim);
-    color: var(--white);
-}
+.icon-btn:active { background: var(--white); color: var(--black); }
 
 /* ══════════════════════════════════════════
    FORM FIELDS
@@ -208,7 +203,8 @@ button {
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.2em;
-    color: var(--white-dim);
+    color: var(--black);
+    opacity: 0.55;
     margin-top: 22px;
     margin-bottom: 8px;
 }
@@ -221,8 +217,8 @@ input[type="text"] {
     width: 100%;
     background: transparent;
     border: none;
-    border-bottom: 2px solid var(--rule);
-    color: var(--white);
+    border-bottom: 2px solid var(--black);
+    color: var(--black);
     font-family: var(--font-body);
     font-size: 16px;
     padding: 8px 0 10px;
@@ -231,26 +227,22 @@ input[type="text"] {
     -webkit-appearance: none;
     transition: border-color 0.15s;
 }
-input:focus        { border-bottom-color: var(--white); }
-input::placeholder { color: var(--white-dim); opacity: 0.5; }
+input:focus        { border-bottom-color: var(--red); }
+input::placeholder { color: var(--black); opacity: 0.3; }
 
 .error {
     font-family: var(--font-body);
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: var(--red-hot);
+    color: var(--red);
     min-height: 16px;
 }
 
 /* ══════════════════════════════════════════
-   STATUS CHIP
-   app.js sets className directly:
-     'status-chip bottom-left connected'
-     'status-chip bottom-left disconnected'
+   STATUS CHIP (lives in main header = red bg)
 ══════════════════════════════════════════ */
 
-/* Neutralise the absolute-positioning helpers app.js appends */
 .bottom-left,
 .bottom-right {
     position: static !important;
@@ -266,14 +258,14 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    border: 1.5px solid var(--rule);
-    color: var(--white-dim);
+    border: 2px solid rgba(255,255,255,0.5);
+    color: rgba(255,255,255,0.6);
     background: transparent;
     white-space: nowrap;
     cursor: default;
 }
-.status-chip.connected    { border-color: var(--white-dim); color: var(--white); }
-.status-chip.disconnected { border-color: var(--red-fade);  color: var(--red);   cursor: pointer; }
+.status-chip.connected    { border-color: var(--white); color: var(--white); }
+.status-chip.disconnected { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.5); cursor: pointer; }
 
 /* ══════════════════════════════════════════
    AUTH SCREEN
@@ -281,71 +273,60 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
 
 #screen-auth { justify-content: flex-start; }
 
+/* Brand block is full solid red */
 .auth-brand {
-    position: relative;
-    padding: calc(var(--safe-top) + 44px) 28px 32px;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-/* Angled red rectangle — the Constructivist background shard */
-.auth-brand::before {
-    content: '';
-    position: absolute;
-    top: -24px;
-    right: -48px;
-    width: 200px;
-    height: 200px;
     background: var(--red);
-    transform: rotate(18deg);
-    z-index: 0;
+    padding: calc(var(--safe-top) + 44px) calc(var(--safe-left) + 28px) 36px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
 }
 
-/* Diagonal stripe overlay on the red shard */
+/* Diagonal stripe texture — bottom-right corner */
 .auth-brand::after {
     content: '';
     position: absolute;
-    top: 16px;
-    right: 72px;
-    width: 64px;
-    height: 64px;
+    bottom: -32px;
+    right: -32px;
+    width: 160px;
+    height: 160px;
     background: repeating-linear-gradient(
         -45deg,
-        rgba(0,0,0,0.3) 0,
-        rgba(0,0,0,0.3) 5px,
-        transparent     5px,
-        transparent     11px
+        rgba(0,0,0,0.18) 0,
+        rgba(0,0,0,0.18) 6px,
+        transparent      6px,
+        transparent      14px
     );
-    z-index: 1;
     pointer-events: none;
 }
 
 .auth-brand h1 {
-    position: relative;
-    z-index: 2;
     font-family: var(--font-display);
-    font-size: clamp(52px, 15vw, 80px);
-    line-height: 0.9;
+    font-size: clamp(52px, 15vw, 84px);
+    line-height: 0.88;
     letter-spacing: 0.01em;
     text-transform: uppercase;
     color: var(--white);
+    position: relative;
+    z-index: 1;
 }
 
 .auth-brand .subtitle {
-    position: relative;
-    z-index: 2;
     margin-top: 16px;
     font-family: var(--font-body);
     font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.22em;
-    color: var(--white-dim);
+    letter-spacing: 0.24em;
+    color: rgba(255,255,255,0.7);
+    position: relative;
+    z-index: 1;
 }
 
 .auth-form {
     flex: 1;
     overflow-y: auto;
-    padding: 28px 28px calc(var(--safe-bottom) + 20px);
+    background: var(--white);
+    padding: 28px calc(var(--safe-right) + 28px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 28px);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -358,23 +339,48 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     margin-bottom: 8px;
 }
 
+/* ── Landscape: split auth into left (brand) / right (form) ── */
+@media (orientation: landscape) {
+    #screen-auth {
+        flex-direction: row;
+    }
+    .auth-brand {
+        width: 40%;
+        flex-shrink: 0;
+        padding: calc(var(--safe-top) + 28px) 24px calc(var(--safe-bottom) + 28px) calc(var(--safe-left) + 20px);
+        justify-content: center;
+        display: flex;
+        flex-direction: column;
+    }
+    .auth-brand h1 {
+        font-size: clamp(36px, 6vw, 64px);
+    }
+    .auth-rule { display: none; }
+    .auth-form {
+        padding-top: calc(var(--safe-top) + 20px);
+        padding-bottom: calc(var(--safe-bottom) + 20px);
+        padding-right: calc(var(--safe-right) + 20px);
+    }
+}
+
 /* ══════════════════════════════════════════
    MAIN SCREEN
 ══════════════════════════════════════════ */
 
 #screen-main { justify-content: flex-start; }
 
+/* Header — solid red bar */
 .main-header {
+    background: var(--red);
     display: flex;
     align-items: center;
-    padding: calc(var(--safe-top) + 18px) 18px 15px;
+    padding: calc(var(--safe-top) + 18px) calc(var(--safe-right) + 18px) 18px calc(var(--safe-left) + 18px);
     flex-shrink: 0;
 }
 
-/* COMRAD·WATCH — "WATCH" rendered in red */
 .main-logo {
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: 24px;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     flex: 1;
@@ -382,7 +388,7 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
 }
 .main-logo em {
     font-style: normal;
-    color: var(--red);
+    color: var(--white);
 }
 
 .main-header-actions {
@@ -391,88 +397,68 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     gap: 8px;
 }
 
-/* Center area — faint Constructivist grid */
+/* Center — stark white, button is the only statement */
 .main-center {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    position: relative;
+    background: var(--white);
     padding: 24px;
 }
 
-.main-center::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-        linear-gradient(var(--surface) 1px, transparent 1px),
-        linear-gradient(90deg, var(--surface) 1px, transparent 1px);
-    background-size: 44px 44px;
-    pointer-events: none;
+/* ── Landscape: record button beside a slim info column ── */
+@media (orientation: landscape) {
+    .main-center {
+        flex-direction: row;
+        gap: 48px;
+        padding: 16px calc(var(--safe-right) + 24px) 16px calc(var(--safe-left) + 24px);
+    }
+    /* scale the button down so it fits in landscape without cropping */
+    .record-button {
+        width: 180px !important;
+        height: 180px !important;
+    }
+    .record-label {
+        font-size: 20px !important;
+    }
 }
 
 /* ─────────────────────────────────────────
    THE RECORD BUTTON
-   Outer ring → gap → red inner disc → text
+   Solid red disc. Thick black border. No frills.
 ───────────────────────────────────────── */
 
 .record-button {
-    position: relative;
-    z-index: 1;
-    width: 240px;
-    height: 240px;
+    width: 252px;
+    height: 252px;
     border-radius: 50%;
-    border: 4px solid var(--white);
-    background: var(--black);
+    border: 6px solid var(--black);
+    background: var(--red);
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: visible;
-    transition: border-color 0.15s;
+    transition: background 0.1s, transform 0.1s;
+    flex-shrink: 0;
+}
+.record-button:active {
+    background: var(--red-hot);
+    transform: scale(0.97);
 }
 
-/* Slowly rotating dashed outer ring */
-.record-button::before {
-    content: '';
-    position: absolute;
-    inset: -18px;
-    border-radius: 50%;
-    border: 1.5px dashed rgba(200, 0, 10, 0.4);
-    animation: spin-slow 28s linear infinite;
-    pointer-events: none;
-}
+/* Hide legacy inner dot — the button itself is the disc now */
+.record-dot { display: none; }
 
-/* The red inner disc */
-.record-dot {
-    position: absolute;
-    inset: 22px;
-    border-radius: 50%;
-    background: var(--red);
-    font-size: 0;          /* hides original ● character */
-    transition: background 0.12s;
-}
-
-/* Label — sits on top of the red disc via z-index */
 .record-label {
-    position: relative;
-    z-index: 1;
     font-family: var(--font-display);
-    font-size: 23px;
-    line-height: 1.08;
+    font-size: 26px;
+    line-height: 1.05;
     letter-spacing: 0.05em;
     text-align: center;
     text-transform: uppercase;
     color: var(--white);
     pointer-events: none;
-}
-
-.record-button:active .record-dot { background: var(--red-hot);    }
-.record-button:active              { border-color: var(--white-dim); }
-
-@keyframes spin-slow {
-    to { transform: rotate(360deg); }
 }
 
 /* ══════════════════════════════════════════
@@ -492,29 +478,29 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     object-fit: cover;
 }
 
-/* Pulsing red border frame around the whole viewport */
+/* Pulsing red border — unmistakable "RECORDING" indicator */
 .recording-active::after {
     content: '';
     position: absolute;
     inset: 0;
-    box-shadow: inset 0 0 0 4px var(--red);
+    box-shadow: inset 0 0 0 5px var(--red);
     pointer-events: none;
     z-index: 5;
-    animation: frame-pulse 1s ease-in-out infinite alternate;
+    animation: frame-pulse 0.9s ease-in-out infinite alternate;
 }
 
 @keyframes frame-pulse {
-    from { box-shadow: inset 0 0 0 4px rgba(200, 0, 10, 0.55); }
-    to   { box-shadow: inset 0 0 0 4px rgba(255, 26,  0, 1.0);  }
+    from { box-shadow: inset 0 0 0 5px rgba(204,0,0,0.55); }
+    to   { box-shadow: inset 0 0 0 5px rgba(204,0,0,1.0);  }
 }
 
-/* Constructivist diagonal stripe — top-right corner accent */
+/* Constructivist diagonal stripe — top-right */
 .rec-corner-stripe {
     position: absolute;
     top: 0;
     right: 0;
-    width: 88px;
-    height: 88px;
+    width: 80px;
+    height: 80px;
     overflow: hidden;
     pointer-events: none;
     z-index: 6;
@@ -522,10 +508,10 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
 .rec-corner-stripe::before {
     content: '';
     position: absolute;
-    top: -12px;
-    right: -12px;
-    width: 120px;
-    height: 120px;
+    top: -10px;
+    right: -10px;
+    width: 110px;
+    height: 110px;
     background: repeating-linear-gradient(
         -45deg,
         var(--red)  0,
@@ -533,30 +519,29 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
         transparent 6px,
         transparent 14px
     );
-    opacity: 0.5;
+    opacity: 0.65;
 }
 
-/* Top info bar */
+/* Info bar — SOLID RED for maximum daytime + nighttime visibility */
 .recording-bar {
     position: absolute;
-    top: calc(var(--safe-top) + 14px);
-    left: 14px;
-    right: 14px;
-    background: rgba(8, 8, 8, 0.82);
-    border-left: 3px solid var(--red);
-    padding: 10px 14px;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--red);
+    padding: calc(var(--safe-top) + 10px) calc(var(--safe-right) + 14px) 10px calc(var(--safe-left) + 14px);
     display: flex;
     align-items: center;
     gap: 10px;
     z-index: 10;
 }
 
-/* Blinking REC dot */
+/* Blinking white dot */
 .rec-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: var(--red-hot);
+    background: var(--white);
     flex-shrink: 0;
     animation: blink-sharp 1s step-end infinite;
 }
@@ -568,7 +553,7 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
 
 #timer {
     font-family: var(--font-display);
-    font-size: 26px;
+    font-size: 28px;
     letter-spacing: 0.04em;
     color: var(--white);
     font-variant-numeric: tabular-nums;
@@ -576,10 +561,10 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
 
 .spacer { flex: 1; }
 
-.status-dot { width: 8px; height: 8px; flex-shrink: 0; }
-.status-dot.connecting { background: #FF9500; border-radius: 50%; }
-.status-dot.live       { background: #00C060; border-radius: 50%; }
-.status-dot.warn       { background: #FF9500; border-radius: 50%; }
+.status-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; }
+.status-dot.connecting { background: rgba(255,255,255,0.5); animation: blink-sharp 1s step-end infinite; }
+.status-dot.live       { background: var(--white); }
+.status-dot.warn       { background: #FFD700; } /* yellow-on-red = max contrast */
 
 #status-text {
     font-family: var(--font-body);
@@ -589,42 +574,57 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     color: var(--white);
 }
 
-/* STOP button — angular, high contrast */
+/* STOP button — white block, heavy black border, very visible */
 .menu-toggle {
     position: absolute;
-    bottom: calc(var(--safe-bottom) + 28px);
+    bottom: calc(var(--safe-bottom) + 32px);
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(8, 8, 8, 0.88);
-    border: 2px solid var(--white);
-    color: var(--white);
+    background: var(--white);
+    border: 4px solid var(--black);
+    color: var(--black);
     font-family: var(--font-display);
-    font-size: 20px;
+    font-size: 22px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    padding: 14px 38px;
+    padding: 14px 44px;
     z-index: 10;
-    transition: background 0.1s;
+    transition: background 0.1s, color 0.1s;
+    white-space: nowrap;
 }
-.menu-toggle:active { background: rgba(255,255,255,0.1); }
+.menu-toggle:active { background: var(--black); color: var(--white); }
+
+/* ── Landscape: move stop button to right edge ── */
+@media (orientation: landscape) {
+    .menu-toggle {
+        bottom: 50%;
+        right: calc(var(--safe-right) + 20px);
+        left: auto;
+        transform: translateY(50%);
+        padding: 14px 24px;
+    }
+    .recording-bar {
+        /* narrower vertical strip on the left in landscape? No — keep top bar, just account for safe areas */
+    }
+}
 
 /* Stop confirmation overlay */
 .stop-menu {
     position: absolute;
     inset: 0;
-    background: rgba(8, 8, 8, 0.97);
+    background: rgba(10,10,10,0.97);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 20;
-    padding: 40px 28px calc(var(--safe-bottom) + 24px);
+    padding: 40px calc(var(--safe-right) + 28px) calc(var(--safe-bottom) + 24px) calc(var(--safe-left) + 28px);
 }
 
 .stop-menu-title {
     font-family: var(--font-display);
-    font-size: 44px;
-    line-height: 0.92;
+    font-size: 52px;
+    line-height: 0.9;
     letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--white);
@@ -634,7 +634,7 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
 
 .stop-menu-rule {
     width: 100%;
-    height: 3px;
+    height: 4px;
     background: var(--red);
     margin-bottom: 32px;
 }
@@ -642,12 +642,12 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
 #btn-stop-save {
     display: block;
     width: 100%;
-    padding: 19px 20px;
+    padding: 20px 20px;
     background: var(--red);
     border: none;
     color: var(--white);
     font-family: var(--font-display);
-    font-size: 26px;
+    font-size: 28px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     text-align: center;
@@ -661,8 +661,8 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     width: 100%;
     padding: 14px 20px;
     background: transparent;
-    border: 2px solid var(--surface-2);
-    color: var(--white-dim);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.55);
     font-family: var(--font-body);
     font-size: 11px;
     letter-spacing: 0.14em;
@@ -671,7 +671,30 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     margin-bottom: 8px;
     transition: border-color 0.1s, color 0.1s;
 }
-#btn-stop-discard:active { border-color: var(--white-dim); color: var(--white); }
+#btn-stop-discard:active { border-color: var(--white); color: var(--white); }
+
+/* ── Landscape: stop menu in two columns ── */
+@media (orientation: landscape) {
+    .stop-menu {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        justify-content: center;
+        padding: 24px calc(var(--safe-right) + 40px) 24px calc(var(--safe-left) + 40px);
+    }
+    .stop-menu-title {
+        font-size: 36px;
+        width: 100%;
+        margin-bottom: 0;
+    }
+    .stop-menu-rule {
+        width: 100%;
+        margin-bottom: 0;
+    }
+    #btn-stop-save    { width: 48%; margin-bottom: 0; }
+    #btn-stop-discard { width: 48%; margin-bottom: 0; }
+}
 
 /* ══════════════════════════════════════════
    SETTINGS SCREEN
@@ -679,50 +702,52 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
 
 #screen-settings { justify-content: flex-start; }
 
+/* Header — solid red bar */
 .settings-header {
+    background: var(--red);
     display: flex;
     align-items: center;
-    padding: calc(var(--safe-top) + 18px) 20px 16px;
+    padding: calc(var(--safe-top) + 18px) calc(var(--safe-right) + 20px) 18px calc(var(--safe-left) + 20px);
     flex-shrink: 0;
     gap: 14px;
 }
 
 .settings-header h2 {
     font-family: var(--font-display);
-    font-size: 30px;
+    font-size: 32px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--white);
 }
 
-/* Back button — square, not rounded */
 #btn-back {
     background: transparent;
-    border: 2px solid var(--rule);
+    border: 2px solid var(--white);
     color: var(--white);
     font-family: var(--font-display);
     font-size: 18px;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: border-color 0.1s;
+    transition: background 0.1s, color 0.1s;
 }
-#btn-back:active { border-color: var(--white-dim); }
+#btn-back:active { background: var(--white); color: var(--black); }
 
 .settings-body {
     flex: 1;
     overflow-y: auto;
-    padding: 0 20px calc(var(--safe-bottom) + 20px);
+    background: var(--white);
+    padding: 0 calc(var(--safe-right) + 20px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 20px);
     display: flex;
     flex-direction: column;
 }
 
 .settings-section {
     padding: 20px 0;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 2px solid var(--black);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -733,32 +758,33 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.22em;
-    color: var(--white-dim);
+    color: var(--black);
+    opacity: 0.5;
 }
 
 #settings-server-display {
     font-family: var(--font-body);
     font-size: 12px;
-    color: var(--white);
+    color: var(--black);
     word-break: break-all;
 }
 
-/* Status lines (set by app.js: className = 'status-line ok/off') */
 .status-line {
     font-family: var(--font-body);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.07em;
 }
-.status-line.ok  { color: var(--white); }
-.status-line.off { color: var(--white-dim); }
+.status-line.ok  { color: var(--black); }
+.status-line.off { color: var(--black); opacity: 0.4; }
 
 #btn-logout {
     margin-top: 24px;
-    border-top: 1px solid var(--rule);
+    border-top: 2px solid var(--black);
     padding-top: 20px;
     font-size: 11px;
     letter-spacing: 0.16em;
+    opacity: 1;
 }
 
 /* ══════════════════════════════════════════
@@ -770,7 +796,7 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     top: calc(var(--safe-top) + 20px);
     left: 50%;
     transform: translateX(-50%);
-    background: var(--red);
+    background: var(--black);
     color: var(--white);
     font-family: var(--font-display);
     font-size: 18px;
@@ -778,10 +804,9 @@ input::placeholder { color: var(--white-dim); opacity: 0.5; }
     text-transform: uppercase;
     padding: 14px 28px;
     z-index: 100;
+    border-left: 5px solid var(--red);
     opacity: 1;
     transition: opacity 0.5s ease-out;
+    white-space: nowrap;
 }
-
-.save-toast.fade-out {
-    opacity: 0;
-}
+.save-toast.fade-out { opacity: 0; }

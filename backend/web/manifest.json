@@ -4,9 +4,9 @@
   "description": "One-tap activist video recording with cloud backup",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#080808",
-  "theme_color": "#080808",
+  "orientation": "any",
+  "background_color": "#CC0000",
+  "theme_color": "#CC0000",
   "icons": [
     {
       "src": "/icons/icon-192.png",
