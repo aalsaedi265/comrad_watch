@@ -250,11 +250,14 @@ func (s *Server) postProcess(sessionID, userID uuid.UUID, streamKey string) {
 		return
 	}
 
-	// Convert FLV → MP4 using FFmpeg
+	// Convert FLV → MP4 using FFmpeg (10-minute timeout to prevent hanging)
 	// -movflags +faststart: moves the moov atom to the beginning for streaming
 	// -c copy: no re-encoding, just remux (fast)
+	ffmpegCtx, ffmpegCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ffmpegCancel()
+
 	cmd := exec.CommandContext(
-		context.Background(),
+		ffmpegCtx,
 		"ffmpeg",
 		"-i", flvPath,
 		"-c", "copy",
@@ -413,11 +416,14 @@ func (s *Server) postProcessWeb(sessionID, userID uuid.UUID, streamKey, rawPath,
 		return
 	}
 
-	// Convert to MP4 using FFmpeg.
+	// Convert to MP4 using FFmpeg (10-minute timeout to prevent hanging).
 	// Browser may send webm (VP8/VP9+Opus) or mp4 (H.264+AAC).
 	// Re-encode to ensure MP4 compatibility in all cases.
+	ffmpegCtx, ffmpegCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ffmpegCancel()
+
 	cmd := exec.CommandContext(
-		context.Background(),
+		ffmpegCtx,
 		"ffmpeg",
 		"-i", rawPath,
 		"-c:v", "libx264",

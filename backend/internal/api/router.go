@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -59,7 +60,9 @@ func NewRouter(cfg *config.Config, queries *db.Queries, rtmpSrv *rtmp.Server) ht
 	mux.HandleFunc("GET /api/sessions/{id}/video", requireAuth(cfg, ig.ServeSessionVideo))
 
 	// Public video endpoint (Instagram API fetches this server-side)
-	mux.HandleFunc("GET /api/video/{key}", ig.ServePublicVideo)
+	// Rate limited: 20 requests per minute per IP to prevent brute-force key guessing
+	videoLimiter := newRateLimiter(20, time.Minute)
+	mux.HandleFunc("GET /api/video/{key}", videoLimiter.wrap(ig.ServePublicVideo))
 
 	// PWA chunk upload routes (protected)
 	chunks := &chunkHandler{cfg: cfg, queries: queries, rtmpSrv: rtmpSrv}
@@ -70,7 +73,7 @@ func NewRouter(cfg *config.Config, queries *db.Queries, rtmpSrv *rtmp.Server) ht
 	// API routes take priority (more specific patterns win in Go 1.22+ mux)
 	mux.Handle("/", http.FileServer(http.Dir("web")))
 
-	return withLogging(withSecurityHeaders(mux))
+	return withLogging(withSecurityHeaders(cfg, mux))
 }
 
 // --- Rate Limiter (in-memory, per-IP) ---
@@ -119,16 +122,32 @@ func (rl *rateLimiter) allow(ip string) bool {
 
 func (rl *rateLimiter) wrap(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip := r.RemoteAddr
-		if i := strings.LastIndex(ip, ":"); i > 0 {
-			ip = ip[:i]
-		}
+		ip := clientIP(r)
 		if !rl.allow(ip) {
 			writeError(w, http.StatusTooManyRequests, "too many requests, try again later")
 			return
 		}
 		next(w, r)
 	}
+}
+
+// clientIP extracts the real client IP, respecting X-Forwarded-For when
+// behind a reverse proxy (Caddy, nginx, etc.). Falls back to RemoteAddr.
+func clientIP(r *http.Request) string {
+	// X-Forwarded-For: client, proxy1, proxy2 — first entry is the real client
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if comma := strings.Index(xff, ","); comma > 0 {
+			return strings.TrimSpace(xff[:comma])
+		}
+		return strings.TrimSpace(xff)
+	}
+
+	// Strip port from RemoteAddr
+	ip := r.RemoteAddr
+	if i := strings.LastIndex(ip, ":"); i > 0 {
+		ip = ip[:i]
+	}
+	return ip
 }
 
 // --- Request Logging ---
@@ -158,14 +177,22 @@ func withLogging(next http.Handler) http.Handler {
 
 // --- Security Headers ---
 
-func withSecurityHeaders(next http.Handler) http.Handler {
+func withSecurityHeaders(cfg *config.Config, next http.Handler) http.Handler {
+	// Build allowed origin from config (same-origin only)
+	var allowedOrigin string
+	if cfg.PublicHost == "localhost" {
+		allowedOrigin = fmt.Sprintf("http://localhost:%d", cfg.HTTPPort)
+	} else {
+		allowedOrigin = "https://" + cfg.PublicHost
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// CORS — reflect request origin instead of wildcard
+		// CORS — only allow requests from the configured origin
 		origin := r.Header.Get("Origin")
-		if origin != "" {
+		if origin != "" && origin == allowedOrigin {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		}
 
@@ -177,6 +204,23 @@ func withSecurityHeaders(next http.Handler) http.Handler {
 				"font-src 'self' https://fonts.gstatic.com; "+
 				"img-src 'self' data:; "+
 				"connect-src 'self'")
+
+		// Prevent MIME-type sniffing
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+
+		// Prevent clickjacking
+		w.Header().Set("X-Frame-Options", "DENY")
+
+		// Don't leak URLs in referrer headers (stream keys are in URLs)
+		w.Header().Set("Referrer-Policy", "no-referrer")
+
+		// Force HTTPS after first visit (1 year)
+		if cfg.PublicHost != "localhost" {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+
+		// Restrict browser features
+		w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=()")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

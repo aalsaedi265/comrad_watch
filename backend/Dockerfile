@@ -17,13 +17,18 @@ FROM alpine:3.21
 
 RUN apk add --no-cache ffmpeg ca-certificates
 
+# Run as non-root user for security
+RUN addgroup -S comrad && adduser -S comrad -G comrad
+
 WORKDIR /app
 
 COPY --from=builder /server /app/server
 COPY migrations/ /app/migrations/
 COPY web/ /app/web/
 
-RUN mkdir -p /app/segments
+RUN mkdir -p /app/segments && chown -R comrad:comrad /app
+
+USER comrad
 
 EXPOSE 8080 1935
 

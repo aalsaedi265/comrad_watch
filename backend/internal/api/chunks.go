@@ -14,6 +14,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// maxRecordingSize is the maximum total size per recording (2 GB).
+// Prevents a single session from filling the disk.
+const maxRecordingSize = 2 * 1024 * 1024 * 1024 // 2 GB
+
 type chunkHandler struct {
 	cfg     *config.Config
 	queries *db.Queries
@@ -58,6 +62,14 @@ func (h *chunkHandler) ReceiveChunk(w http.ResponseWriter, r *http.Request) {
 	if err := os.MkdirAll(filepath.Dir(recordingPath), 0755); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session directory")
 		return
+	}
+
+	// Check total recording size before accepting another chunk
+	if info, err := os.Stat(recordingPath); err == nil {
+		if info.Size() >= maxRecordingSize {
+			writeError(w, http.StatusRequestEntityTooLarge, "recording size limit reached (2 GB)")
+			return
+		}
 	}
 
 	f, err := os.OpenFile(recordingPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
@@ -108,7 +120,8 @@ func (h *chunkHandler) EndWebSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse optional mime_type from body
+	// Parse optional mime_type from body (limit body size)
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	var req endSessionRequest
 	json.NewDecoder(r.Body).Decode(&req) // ignore errors — mime_type is optional
 
