@@ -1,7 +1,7 @@
 // Comrad Watch Service Worker
 'use strict';
 
-var CACHE_NAME = 'comrad-v2';
+var CACHE_NAME = 'comrad-v3';
 var STATIC_ASSETS = [
     '/',
     '/index.html',

@@ -26,12 +26,14 @@
     <div class="auth-rule"></div>
     <div class="auth-form">
         <div class="form-group">
-            <label class="field-label" for="server-url">Server URL</label>
-            <input id="server-url" type="url" placeholder="https://your-server.com" autocomplete="url">
             <label class="field-label" for="email">Email</label>
             <input id="email" type="email" placeholder="activist@example.com" autocomplete="email">
             <label class="field-label" for="password">Password</label>
             <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+            <div id="password-confirm-group" class="hidden">
+                <label class="field-label" for="password-confirm">Confirm Password</label>
+                <input id="password-confirm" type="password" placeholder="••••••••" autocomplete="new-password">
+            </div>
         </div>
         <p id="auth-error" class="error hidden"></p>
         <button id="btn-login" class="btn-primary">LOG IN</button>
@@ -103,6 +105,22 @@
             <button id="btn-disconnect-ig" class="btn-danger hidden">DISCONNECT</button>
         </div>
         <button id="btn-logout" class="btn-ghost danger">LOG OUT</button>
+    </div>
+</div>
+
+<!-- ▓▓▓ MODAL: FIRST-LOGIN SETUP PROMPT ▓▓▓ -->
+<div id="modal-setup" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">BACK UP YOUR FOOTAGE</span>
+        </div>
+        <div class="modal-rule"></div>
+        <div class="modal-body">
+            <p>Connect <strong>Google Drive</strong> and <strong>Instagram</strong> in Settings.</p>
+            <p>If your phone is seized or destroyed, your footage will still be saved automatically.</p>
+        </div>
+        <button id="btn-modal-settings" class="btn-primary">GO TO SETTINGS</button>
+        <button id="btn-modal-dismiss" class="btn-ghost">REMIND ME LATER</button>
     </div>
 </div>
 

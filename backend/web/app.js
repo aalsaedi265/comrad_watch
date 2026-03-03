@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
     registerServiceWorker();
     handleInstagramCallback();
 
-    if (state.token && state.serverUrl) {
+    if (state.token) {
         showScreen('main');
         refreshMainScreenStatus();
     } else {
@@ -39,8 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function loadPersistedState() {
     state.token = localStorage.getItem('comrad_token');
-    state.serverUrl = localStorage.getItem('comrad_server') || '';
-    document.getElementById('server-url').value = state.serverUrl;
+    state.serverUrl = window.location.origin;
 }
 
 function registerServiceWorker() {
@@ -131,15 +130,14 @@ function uploadWithRetry(sessionId, blob, attempt) {
 function doLogin() {
     var email = document.getElementById('email').value.trim();
     var password = document.getElementById('password').value;
-    var serverUrl = document.getElementById('server-url').value.trim().replace(/\/$/, '');
 
-    if (!serverUrl || !email || !password) {
+    if (!email || !password) {
         showError('auth-error', 'All fields are required');
         return;
     }
 
-    state.serverUrl = serverUrl;
-    localStorage.setItem('comrad_server', serverUrl);
+    var btn = document.getElementById('btn-login');
+    setButtonLoading(btn, 'LOGGING IN...');
 
     api('POST', '/api/login', { email: email, password: password }, false)
         .then(function(data) {
@@ -148,24 +146,33 @@ function doLogin() {
             hideError('auth-error');
             showScreen('main');
             refreshMainScreenStatus();
+            showSetupPromptIfNeeded();
         })
         .catch(function(e) {
             showError('auth-error', e.message);
+        })
+        .finally(function() {
+            clearButtonLoading(btn, 'LOG IN');
         });
 }
 
 function doRegister() {
     var email = document.getElementById('email').value.trim();
     var password = document.getElementById('password').value;
-    var serverUrl = document.getElementById('server-url').value.trim().replace(/\/$/, '');
+    var passwordConfirm = document.getElementById('password-confirm').value;
 
-    if (!serverUrl || !email || !password) {
+    if (!email || !password || !passwordConfirm) {
         showError('auth-error', 'All fields are required');
         return;
     }
 
-    state.serverUrl = serverUrl;
-    localStorage.setItem('comrad_server', serverUrl);
+    if (password !== passwordConfirm) {
+        showError('auth-error', 'Passwords do not match');
+        return;
+    }
+
+    var btn = document.getElementById('btn-register');
+    setButtonLoading(btn, 'CREATING...');
 
     api('POST', '/api/register', { email: email, password: password }, false)
         .then(function(data) {
@@ -174,9 +181,13 @@ function doRegister() {
             hideError('auth-error');
             showScreen('main');
             refreshMainScreenStatus();
+            showSetupPromptIfNeeded();
         })
         .catch(function(e) {
             showError('auth-error', e.message);
+        })
+        .finally(function() {
+            clearButtonLoading(btn, 'CREATE ACCOUNT');
         });
 }
 
@@ -184,17 +195,21 @@ function toggleAuthMode() {
     var btn = document.getElementById('btn-toggle-auth');
     var loginBtn = document.getElementById('btn-login');
     var registerBtn = document.getElementById('btn-register');
+    var confirmGroup = document.getElementById('password-confirm-group');
 
     if (state.authMode === 'login') {
         state.authMode = 'register';
         btn.textContent = 'Already have an account? Log in';
         loginBtn.classList.add('hidden');
         registerBtn.classList.remove('hidden');
+        confirmGroup.classList.remove('hidden');
     } else {
         state.authMode = 'login';
         btn.textContent = 'Need an account? Register';
         loginBtn.classList.remove('hidden');
         registerBtn.classList.add('hidden');
+        confirmGroup.classList.add('hidden');
+        document.getElementById('password-confirm').value = '';
     }
 }
 
@@ -383,7 +398,7 @@ function stopRecording(discard) {
 
 // ==================== Settings ====================
 function loadSettingsScreen() {
-    document.getElementById('settings-server-display').textContent = state.serverUrl || 'Not configured';
+    document.getElementById('settings-server-display').textContent = window.location.origin;
 
     // Drive status
     var driveEl = document.getElementById('drive-status-settings');
@@ -488,11 +503,33 @@ function handleInstagramCallback() {
     }
 }
 
+// ==================== Setup Prompt ====================
+function showSetupPromptIfNeeded() {
+    // Only show once per browser — after that the user knows
+    if (localStorage.getItem('comrad_setup_seen')) return;
+    localStorage.setItem('comrad_setup_seen', '1');
+    document.getElementById('modal-setup').classList.remove('hidden');
+}
+
+function dismissSetupPrompt() {
+    document.getElementById('modal-setup').classList.add('hidden');
+}
+
 // ==================== Helpers ====================
 function formatTime(seconds) {
     var m = Math.floor(seconds / 60);
     var s = seconds % 60;
     return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function setButtonLoading(btn, text) {
+    btn.disabled = true;
+    btn.textContent = text;
+}
+
+function clearButtonLoading(btn, text) {
+    btn.disabled = false;
+    btn.textContent = text;
 }
 
 function setStatus(text, type) {
@@ -557,8 +594,16 @@ function attachEventListeners() {
     document.getElementById('btn-disconnect-ig').onclick = disconnectInstagram;
     document.getElementById('btn-logout').onclick = logout;
 
+    // Setup modal
+    document.getElementById('btn-modal-settings').onclick = function() {
+        dismissSetupPrompt();
+        showScreen('settings');
+        loadSettingsScreen();
+    };
+    document.getElementById('btn-modal-dismiss').onclick = dismissSetupPrompt;
+
     // Enter key in auth fields
-    ['email', 'password'].forEach(function(id) {
+    ['email', 'password', 'password-confirm'].forEach(function(id) {
         document.getElementById(id).addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 state.authMode === 'login' ? doLogin() : doRegister();
