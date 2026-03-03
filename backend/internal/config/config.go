@@ -62,8 +62,14 @@ func Load() (*Config, error) {
 	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET is required")
 	}
+	if len(cfg.JWTSecret) < 32 {
+		return nil, fmt.Errorf("JWT_SECRET must be at least 32 characters (got %d)", len(cfg.JWTSecret))
+	}
 	if (cfg.GoogleClientID != "" || cfg.InstagramAppID != "") && cfg.EncryptionKey == "" {
 		return nil, fmt.Errorf("ENCRYPTION_KEY is required when Google Drive or Instagram is configured")
+	}
+	if cfg.EncryptionKey != "" && len(cfg.EncryptionKey) < 32 {
+		return nil, fmt.Errorf("ENCRYPTION_KEY must be at least 32 characters (got %d)", len(cfg.EncryptionKey))
 	}
 
 	// Warn if Google redirect URI uses HTTP in production

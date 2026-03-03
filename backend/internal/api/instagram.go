@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/comradwatch/backend/internal/config"
 	"github.com/comradwatch/backend/internal/crypto"
@@ -44,15 +46,23 @@ func (h *instagramHandler) ConnectInstagram(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if req.Code == "" || req.RedirectURI == "" {
-		writeError(w, http.StatusBadRequest, "code and redirect_uri are required")
+	if req.Code == "" {
+		writeError(w, http.StatusBadRequest, "code is required")
 		return
 	}
 
 	ctx := r.Context()
 
+	// Build redirect URI server-side — never trust client-provided values
+	var redirectURI string
+	if h.cfg.PublicHost == "localhost" {
+		redirectURI = fmt.Sprintf("http://localhost:%d/?ig_callback=1", h.cfg.HTTPPort)
+	} else {
+		redirectURI = fmt.Sprintf("https://%s/?ig_callback=1", h.cfg.PublicHost)
+	}
+
 	// Step 1: Exchange auth code for short-lived token
-	shortToken, err := h.ig.ExchangeCode(ctx, req.Code, req.RedirectURI)
+	shortToken, err := h.ig.ExchangeCode(ctx, req.Code, redirectURI)
 	if err != nil {
 		log.Printf("instagram: failed to exchange code: %v", err)
 		writeError(w, http.StatusBadGateway, "failed to connect Instagram")
@@ -173,9 +183,17 @@ func (h *instagramHandler) ServeSessionVideo(w http.ResponseWriter, r *http.Requ
 
 // --- Public video endpoint (for Instagram API to fetch) ---
 
+// publicVideoExpiry is how long a video remains accessible via the public URL
+// after the session ends. After this window, the video returns 410 Gone.
+// Instagram typically fetches within minutes, so 2 hours is generous.
+const publicVideoExpiry = 2 * time.Hour
+
 // ServePublicVideo serves a session video without auth, keyed by stream key.
 // This is needed because the Instagram API fetches the video_url server-side
 // and cannot provide our JWT token. The stream key acts as a secret URL token.
+//
+// SECURITY: This URL expires 2 hours after the session ends. After that,
+// the video is only accessible via authenticated endpoints or Google Drive.
 func (h *instagramHandler) ServePublicVideo(w http.ResponseWriter, r *http.Request) {
 	streamKey := r.PathValue("key")
 	if streamKey == "" {
@@ -183,13 +201,20 @@ func (h *instagramHandler) ServePublicVideo(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Look up session by stream key (any status, not just active)
+	// Look up session by stream key and check expiry
 	var sessionID uuid.UUID
+	var endedAt *time.Time
 	err := h.queries.Pool().QueryRow(r.Context(),
-		`SELECT id FROM sessions WHERE stream_key = $1`, streamKey,
-	).Scan(&sessionID)
+		`SELECT id, ended_at FROM sessions WHERE stream_key = $1`, streamKey,
+	).Scan(&sessionID, &endedAt)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+
+	// Enforce expiry: video only accessible for a limited window after session ends
+	if endedAt != nil && time.Since(*endedAt) > publicVideoExpiry {
+		writeError(w, http.StatusGone, "video link expired")
 		return
 	}
 

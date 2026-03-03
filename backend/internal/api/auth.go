@@ -53,8 +53,21 @@ func (h *authHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate email format
+	req.Email = strings.TrimSpace(req.Email)
+	if !isValidEmail(req.Email) {
+		writeError(w, http.StatusBadRequest, "invalid email address")
+		return
+	}
+
 	if len(req.Password) < 8 {
 		writeError(w, http.StatusBadRequest, "password must be at least 8 characters")
+		return
+	}
+
+	// bcrypt has a 72-byte limit — reject longer passwords with a clear message
+	if len(req.Password) > 72 {
+		writeError(w, http.StatusBadRequest, "password must be 72 characters or fewer")
 		return
 	}
 
@@ -217,4 +230,22 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+// isValidEmail does a basic sanity check on email format.
+// Not a full RFC 5322 parser — just ensures it has one @, a local part,
+// a domain with a dot, and reasonable length.
+func isValidEmail(email string) bool {
+	if len(email) > 254 {
+		return false
+	}
+	at := strings.LastIndex(email, "@")
+	if at < 1 {
+		return false // no @ or empty local part
+	}
+	domain := email[at+1:]
+	if len(domain) < 3 || !strings.Contains(domain, ".") {
+		return false // domain too short or no dot
+	}
+	return true
 }
