@@ -1,0 +1,11 @@
+.env
+.env.*
+segments/
+uploads/
+bin/
+tmp/
+*.exe
+*.test
+.git
+.gitignore
+README.md

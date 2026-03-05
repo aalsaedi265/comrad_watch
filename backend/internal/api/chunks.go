@@ -59,7 +59,7 @@ func (h *chunkHandler) ReceiveChunk(w http.ResponseWriter, r *http.Request) {
 	recordingPath := filepath.Join(h.cfg.SegmentDir, sessionID.String(), "recording.webm")
 
 	// Ensure session directory exists
-	if err := os.MkdirAll(filepath.Dir(recordingPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(recordingPath), 0700); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session directory")
 		return
 	}
@@ -72,7 +72,7 @@ func (h *chunkHandler) ReceiveChunk(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	f, err := os.OpenFile(recordingPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(recordingPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to open recording file")
 		return
