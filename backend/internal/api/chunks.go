@@ -72,7 +72,7 @@ func (h *chunkHandler) ReceiveChunk(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	f, err := os.OpenFile(recordingPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(recordingPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to open recording file")
 		return
