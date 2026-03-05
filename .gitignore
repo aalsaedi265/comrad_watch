@@ -13,6 +13,7 @@ backend/uploads/
 
 # Environment
 .env
+backend/.env
 .env.local
 .env.*.local
 

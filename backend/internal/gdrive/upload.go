@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -73,9 +74,11 @@ func (u *Uploader) Upload(ctx context.Context, token *oauth2.Token, mp4Path stri
 
 // findOrCreateFolder finds a folder by name under parentID, or creates it.
 func findOrCreateFolder(ctx context.Context, srv *drive.Service, parentID, name string) (string, error) {
+	// Escape single quotes to prevent query injection in Drive API
+	safeName := strings.ReplaceAll(name, "'", "\\'")
 	query := fmt.Sprintf(
 		"name = '%s' and '%s' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-		name, parentID,
+		safeName, parentID,
 	)
 
 	result, err := srv.Files.List().Q(query).Fields("files(id)").Context(ctx).Do()

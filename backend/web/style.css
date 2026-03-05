@@ -451,9 +451,6 @@ input::placeholder { color: var(--black); opacity: 0.3; }
     transform: scale(0.97);
 }
 
-/* Hide legacy inner dot — the button itself is the disc now */
-.record-dot { display: none; }
-
 .record-label {
     font-family: var(--font-display);
     font-size: 26px;

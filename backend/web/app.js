@@ -6,7 +6,6 @@ var state = {
     token: null,
     serverUrl: null,
     sessionId: null,
-    streamKey: null,
     mediaRecorder: null,
     cameraStream: null,
     timerInterval: null,
@@ -15,7 +14,6 @@ var state = {
     startingRecording: false, // guard against double-tap
     driveConnected: null,
     igConnected: null,
-    igAccountId: null,
     instagramAppId: null,
     authMode: 'login',
     mimeType: '',
@@ -59,6 +57,13 @@ function showScreen(id) {
 }
 
 // ==================== API Layer ====================
+function handleExpiredToken() {
+    state.token = null;
+    localStorage.removeItem('comrad_token');
+    if (state.uploadActive) stopRecording(true);
+    showScreen('auth');
+}
+
 function api(method, path, body, requiresAuth) {
     if (requiresAuth === undefined) requiresAuth = true;
     var url = state.serverUrl + path;
@@ -69,11 +74,8 @@ function api(method, path, body, requiresAuth) {
     var opts = { method: method, headers: headers };
     if (body) opts.body = JSON.stringify(body);
     return fetch(url, opts).then(function(res) {
-        // Handle expired token — redirect to login
         if (res.status === 401 && requiresAuth) {
-            state.token = null;
-            localStorage.removeItem('comrad_token');
-            showScreen('auth');
+            handleExpiredToken();
             throw new Error('Session expired. Please log in again.');
         }
         if (!res.ok) {
@@ -98,10 +100,7 @@ function uploadChunk(sessionId, blob) {
         body: blob,
     }).then(function(res) {
         if (res.status === 401) {
-            state.token = null;
-            localStorage.removeItem('comrad_token');
-            stopRecording(true);
-            showScreen('auth');
+            handleExpiredToken();
             throw new Error('Session expired');
         }
         if (!res.ok) throw new Error('chunk upload failed: ' + res.status);
@@ -225,7 +224,6 @@ function logout() {
     }
     state.token = null;
     state.sessionId = null;
-    state.streamKey = null;
     state.driveConnected = null;
     state.igConnected = null;
     localStorage.removeItem('comrad_token');
@@ -283,7 +281,6 @@ function startRecording() {
         // Start session on server
         return api('POST', '/api/sessions/start', {}).then(function(session) {
             state.sessionId = session.session_id;
-            state.streamKey = session.stream_key;
             state.elapsedSeconds = 0;
             state.uploadActive = true;
             state.startingRecording = false;
@@ -381,7 +378,6 @@ function stopRecording(discard) {
         }
 
         state.sessionId = null;
-        state.streamKey = null;
         state.mediaRecorder = null;
 
         showScreen('main');
@@ -433,7 +429,6 @@ function loadSettingsScreen() {
 
     api('GET', '/api/instagram/status').then(function(data) {
         state.igConnected = data.connected;
-        state.igAccountId = data.account_id;
         if (data.connected) {
             igEl.textContent = 'Connected \u2713' + (data.account_id ? ' (' + data.account_id + ')' : '');
             igEl.className = 'status-line ok';

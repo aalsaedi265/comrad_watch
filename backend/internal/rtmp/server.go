@@ -45,7 +45,6 @@ type activeStream struct {
 	flvEncoder *flv.Encoder
 	startedAt  time.Time
 	lastSync   time.Time
-	cancel     context.CancelFunc
 	writeMu    sync.Mutex // protects flvEncoder writes
 }
 
@@ -113,7 +112,7 @@ func (s *Server) registerStream(streamKey string) error {
 
 	// Create session directory
 	sessionDir := filepath.Join(s.cfg.SegmentDir, session.ID.String())
-	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
 		return fmt.Errorf("create session dir: %w", err)
 	}
 
@@ -138,7 +137,6 @@ func (s *Server) registerStream(streamKey string) error {
 		flvEncoder: enc,
 		startedAt:  time.Now(),
 		lastSync:   time.Now(),
-		cancel:     func() {},
 	}
 
 	s.mu.Lock()
@@ -205,8 +203,6 @@ func (s *Server) finalizeStream(streamKey string, stream *activeStream, reason s
 		stream.flvFile.Sync()
 		stream.flvFile.Close()
 	}
-
-	stream.cancel()
 
 	// Update session in database
 	if err := s.queries.EndSession(

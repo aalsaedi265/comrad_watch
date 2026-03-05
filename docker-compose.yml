@@ -22,7 +22,7 @@ services:
       - "1935:1935"
     environment:
       DATABASE_URL: postgres://comradwatch:devpassword@db:5432/comradwatch?sslmode=disable
-      JWT_SECRET: dev-secret-change-in-production
+      JWT_SECRET: dev-secret-change-in-production!
       SEGMENT_DIR: /app/segments
       HTTP_PORT: "8080"
       RTMP_PORT: "1935"
