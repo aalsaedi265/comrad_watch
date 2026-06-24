@@ -31,7 +31,7 @@ type loginRequest struct {
 }
 
 type authResponse struct {
-	Token string `json:"token"`
+	Token string       `json:"token"`
 	User  userResponse `json:"user"`
 }
 

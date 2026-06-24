@@ -32,4 +32,9 @@ USER comrad
 
 EXPOSE 8080 1935
 
+# Health check hits the public health endpoint so orchestrators can detect a
+# wedged server. Uses busybox wget (bundled with Alpine).
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget -qO- "http://localhost:${HTTP_PORT:-8080}/api/health" >/dev/null 2>&1 || exit 1
+
 CMD ["/app/server"]

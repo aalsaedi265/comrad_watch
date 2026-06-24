@@ -202,23 +202,19 @@ func (h *instagramHandler) ServePublicVideo(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Look up session by stream key and check expiry
-	var sessionID uuid.UUID
-	var endedAt *time.Time
-	err := h.queries.Pool().QueryRow(r.Context(),
-		`SELECT id, ended_at FROM sessions WHERE stream_key = $1`, streamKey,
-	).Scan(&sessionID, &endedAt)
-	if err != nil {
+	info, err := h.queries.GetSessionVideoInfoByStreamKey(r.Context(), streamKey)
+	if err != nil || info == nil {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
 
 	// Enforce expiry: video only accessible for a limited window after session ends
-	if endedAt != nil && time.Since(*endedAt) > publicVideoExpiry {
+	if info.EndedAt != nil && time.Since(*info.EndedAt) > publicVideoExpiry {
 		writeError(w, http.StatusGone, "video link expired")
 		return
 	}
 
-	mp4Path := filepath.Join(h.cfg.SegmentDir, sessionID.String(), "recording.mp4")
+	mp4Path := filepath.Join(h.cfg.SegmentDir, info.ID.String(), "recording.mp4")
 	if _, err := os.Stat(mp4Path); os.IsNotExist(err) {
 		writeError(w, http.StatusNotFound, "video not found")
 		return

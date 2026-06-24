@@ -22,12 +22,12 @@ type startSessionResponse struct {
 }
 
 type sessionListItem struct {
-	ID           string  `json:"id"`
-	StartedAt    string  `json:"started_at"`
-	EndedAt      *string `json:"ended_at"`
-	EndReason    *string `json:"end_reason"`
-	Status       string  `json:"status"`
-	TotalSegments int    `json:"total_segments"`
+	ID            string  `json:"id"`
+	StartedAt     string  `json:"started_at"`
+	EndedAt       *string `json:"ended_at"`
+	EndReason     *string `json:"end_reason"`
+	Status        string  `json:"status"`
+	TotalSegments int     `json:"total_segments"`
 }
 
 // StartSession creates a new streaming session and returns a stream key.

@@ -131,15 +131,20 @@ func (rl *rateLimiter) wrap(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// clientIP extracts the real client IP, respecting X-Forwarded-For when
-// behind a reverse proxy (Caddy, nginx, etc.). Falls back to RemoteAddr.
+// clientIP extracts the real client IP for rate limiting, respecting
+// X-Forwarded-For when behind a reverse proxy (Caddy in production).
+//
+// SECURITY: With a single trusted proxy, the genuine client IP is the LAST
+// entry the proxy appends to X-Forwarded-For. Earlier entries are supplied by
+// the client and are therefore spoofable — trusting the first entry would let
+// an attacker rotate a fake IP to evade per-IP rate limiting. Falls back to
+// RemoteAddr when there is no proxy header.
 func clientIP(r *http.Request) string {
-	// X-Forwarded-For: client, proxy1, proxy2 — first entry is the real client
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if comma := strings.Index(xff, ","); comma > 0 {
-			return strings.TrimSpace(xff[:comma])
+		parts := strings.Split(xff, ",")
+		if last := strings.TrimSpace(parts[len(parts)-1]); last != "" {
+			return last
 		}
-		return strings.TrimSpace(xff)
 	}
 
 	// Strip port from RemoteAddr

@@ -1,6 +1,6 @@
 # Comrad Watch - Project Status
 
-Last updated: 2026-02-26
+Last updated: 2026-06-24
 
 ## What This Project Is
 
@@ -20,7 +20,7 @@ Everything in `backend/`. A single Go binary that:
 
 2. **REST API** (port 8080) — serves the mobile app
    - `POST /api/register` — create account (email + password, bcrypt hashed)
-   - `POST /api/login` — get JWT token (30-day expiry)
+   - `POST /api/login` — get JWT token (7-day expiry)
    - `POST /api/sessions/start` — create a streaming session, returns RTMP URL + stream key
    - `GET /api/sessions` — list user's sessions
    - `GET /api/health` — health check
@@ -106,12 +106,27 @@ Automatic Instagram Story posting when a recording finishes.
    - Deep link handled in `MainActivity`, code exchanged via backend
    - Shows connected/disconnected status with disconnect option
 
+### Phase 5: Progressive Web App (COMPLETE)
+
+A browser-based PWA (`backend/web/`) replaces the planned native iOS app — it
+runs on iPhone (Safari), Android (Chrome), and desktop with no app store.
+
+1. **Chunked HTTP upload** — browsers can't speak RTMP, so the PWA records with
+   `MediaRecorder` and POSTs ~2-second blobs to `POST /api/sessions/{id}/chunk`,
+   which the server appends to a single recording file.
+2. **Post-processing reuse** — `POST /api/sessions/{id}/end` triggers the same
+   FFmpeg → MP4 → Google Drive → Instagram pipeline as the RTMP path
+   (`PostProcessWebSession` in `internal/rtmp/server.go`).
+3. **Offline-capable** — service worker (`web/sw.js`) caches static assets
+   (cache-first) and never caches `/api/*` (network-only).
+4. Files: `internal/api/chunks.go`, `web/index.html`, `web/app.js`,
+   `web/style.css`, `web/sw.js`, `web/manifest.json`.
+
 ### What's NOT Built Yet
 
 | Phase | What | Context for Implementation |
 |-------|------|--------------------------|
-| **Phase 5** | **iOS app** | SwiftUI UI layer + AVFoundation camera + HaishinKit for RTMP streaming. The KMP shared module already compiles for iOS targets (iosX64, iosArm64, iosSimulatorArm64). The shared API client and models will be reused. Only the UI layer and camera/streaming code need to be written natively in Swift. |
-| **Phase 6** | **Polish & launch** | Reconnection logic for dropped RTMP streams, local recording gap-fill, error UX, app store submissions. |
+| **Phase 6** | **Polish & launch** | OAuth token refresh (long-lived Instagram tokens expire ~60 days), reconnection logic for dropped RTMP streams, recording-history UI, error UX. |
 
 ## Key Libraries & Gotchas
 
