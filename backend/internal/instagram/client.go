@@ -18,16 +18,16 @@ const graphFBBase = "https://graph.facebook.com/v21.0"
 
 // Client communicates with the Instagram Graph API to publish Stories.
 type Client struct {
-	appID     string
-	appSecret string
+	appID      string
+	appSecret  string
 	httpClient *http.Client
 }
 
 // NewClient creates an Instagram API client.
 func NewClient(appID, appSecret string) *Client {
 	return &Client{
-		appID:     appID,
-		appSecret: appSecret,
+		appID:      appID,
+		appSecret:  appSecret,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 	}
 }

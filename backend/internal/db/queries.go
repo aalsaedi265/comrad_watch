@@ -17,23 +17,18 @@ func New(pool *pgxpool.Pool) *Queries {
 	return &Queries{pool: pool}
 }
 
-// Pool returns the underlying connection pool for ad-hoc queries.
-func (q *Queries) Pool() *pgxpool.Pool {
-	return q.pool
-}
-
 // --- User operations ---
 
 type User struct {
-	ID                    uuid.UUID
-	Email                 string
-	PasswordHash          string
-	GoogleTokenEncrypted  *string
+	ID                      uuid.UUID
+	Email                   string
+	PasswordHash            string
+	GoogleTokenEncrypted    *string
 	InstagramTokenEncrypted *string
-	InstagramAccountID    *string
-	DefaultCamera         string
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	InstagramAccountID      *string
+	DefaultCamera           string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 func (q *Queries) CreateUser(ctx context.Context, email, passwordHash string) (*User, error) {
@@ -57,25 +52,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 		        instagram_account_id, default_camera, created_at, updated_at
 		 FROM users WHERE email = $1`,
 		email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.GoogleTokenEncrypted,
-		&user.InstagramTokenEncrypted, &user.InstagramAccountID, &user.DefaultCamera,
-		&user.CreatedAt, &user.UpdatedAt)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return user, nil
-}
-
-func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
-	user := &User{}
-	err := q.pool.QueryRow(ctx,
-		`SELECT id, email, password_hash, google_token_encrypted, instagram_token_encrypted,
-		        instagram_account_id, default_camera, created_at, updated_at
-		 FROM users WHERE id = $1`,
-		id,
 	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.GoogleTokenEncrypted,
 		&user.InstagramTokenEncrypted, &user.InstagramAccountID, &user.DefaultCamera,
 		&user.CreatedAt, &user.UpdatedAt)
@@ -185,6 +161,31 @@ func (q *Queries) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (*Ses
 	return session, nil
 }
 
+// SessionVideoInfo holds the minimal fields needed to serve a public video
+// link: the session ID and when the session ended (used for expiry checks).
+type SessionVideoInfo struct {
+	ID      uuid.UUID
+	EndedAt *time.Time
+}
+
+// GetSessionVideoInfoByStreamKey looks up a session by its stream key,
+// returning only the fields needed to serve and expire its public video link.
+// Returns nil if no session matches.
+func (q *Queries) GetSessionVideoInfoByStreamKey(ctx context.Context, streamKey string) (*SessionVideoInfo, error) {
+	info := &SessionVideoInfo{}
+	err := q.pool.QueryRow(ctx,
+		`SELECT id, ended_at FROM sessions WHERE stream_key = $1`,
+		streamKey,
+	).Scan(&info.ID, &info.EndedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return info, nil
+}
+
 func (q *Queries) EndSession(ctx context.Context, sessionID uuid.UUID, endReason string, totalSegments int, durationSeconds int) error {
 	_, err := q.pool.Exec(ctx,
 		`UPDATE sessions
@@ -282,28 +283,4 @@ func (q *Queries) CreateSegment(ctx context.Context, sessionID uuid.UUID, segmen
 		return nil, err
 	}
 	return seg, nil
-}
-
-func (q *Queries) GetSegmentsBySession(ctx context.Context, sessionID uuid.UUID) ([]*Segment, error) {
-	rows, err := q.pool.Query(ctx,
-		`SELECT id, session_id, segment_number, file_path, duration_ms, size_bytes, received_at
-		 FROM segments WHERE session_id = $1
-		 ORDER BY segment_number ASC`,
-		sessionID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var segments []*Segment
-	for rows.Next() {
-		seg := &Segment{}
-		if err := rows.Scan(&seg.ID, &seg.SessionID, &seg.SegmentNumber, &seg.FilePath,
-			&seg.DurationMS, &seg.SizeBytes, &seg.ReceivedAt); err != nil {
-			return nil, err
-		}
-		segments = append(segments, seg)
-	}
-	return segments, rows.Err()
 }

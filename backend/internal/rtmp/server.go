@@ -1,6 +1,7 @@
 package rtmp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -231,52 +233,38 @@ func (s *Server) finalizeStream(streamKey string, stream *activeStream, reason s
 	go s.postProcess(stream.sessionID, stream.userID, stream.streamKey)
 }
 
-// postProcess converts FLV → MP4 via FFmpeg, then uploads.
-func (s *Server) postProcess(sessionID, userID uuid.UUID, streamKey string) {
-	log.Printf("post-processing session %s", sessionID)
+// ffmpegTimeout caps how long a single FFmpeg conversion may run before it is
+// killed, preventing a stuck process from holding resources indefinitely.
+const ffmpegTimeout = 10 * time.Minute
 
-	sessionDir := filepath.Join(s.cfg.SegmentDir, sessionID.String())
-	flvPath := filepath.Join(sessionDir, "recording.flv")
-	mp4Path := filepath.Join(sessionDir, "recording.mp4")
+// runFFmpeg executes FFmpeg with the given arguments, capturing stderr so it can
+// be surfaced on failure instead of flooding the server logs on every success.
+func runFFmpeg(args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), ffmpegTimeout)
+	defer cancel()
 
-	// Check FLV file exists
-	if _, err := os.Stat(flvPath); os.IsNotExist(err) {
-		log.Printf("no FLV file found for session %s", sessionID)
-		s.queries.UpdateSessionStatus(context.Background(), sessionID, "failed")
-		return
-	}
-
-	// Convert FLV → MP4 using FFmpeg (10-minute timeout to prevent hanging)
-	// -movflags +faststart: moves the moov atom to the beginning for streaming
-	// -c copy: no re-encoding, just remux (fast)
-	ffmpegCtx, ffmpegCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ffmpegCancel()
-
-	cmd := exec.CommandContext(
-		ffmpegCtx,
-		"ffmpeg",
-		"-i", flvPath,
-		"-c", "copy",
-		"-movflags", "+faststart",
-		"-y", // overwrite if exists
-		mp4Path,
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		log.Printf("FFmpeg conversion failed for session %s: %v", sessionID, err)
-		// Still mark as "finalized" — the FLV is still usable
-		s.queries.UpdateSessionStatus(context.Background(), sessionID, "finalized_flv")
-		return
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 	}
+	return nil
+}
 
-	log.Printf("MP4 ready: %s", mp4Path)
+// removeRawRecording deletes the intermediate recording (FLV/WebM) once the MP4
+// has been produced. Best-effort: a failure here only wastes disk space.
+func removeRawRecording(path string) {
+	if err := os.Remove(path); err != nil {
+		log.Printf("warning: failed to remove raw recording %s: %v", path, err)
+	}
+}
 
-	// Upload to Google Drive (if user has connected)
+// finishAndUpload runs the best-effort Google Drive upload and Instagram Story
+// post for a finished MP4, then records the resulting session status. Shared by
+// the RTMP and web post-processing paths.
+func (s *Server) finishAndUpload(sessionID, userID uuid.UUID, streamKey, mp4Path string) {
 	driveOk := s.uploadToGoogleDrive(sessionID, userID, mp4Path)
-
-	// Post to Instagram Story (if user has connected Instagram)
 	igOk := s.postToInstagram(sessionID, userID, streamKey)
 
 	status := "processed"
@@ -285,6 +273,37 @@ func (s *Server) postProcess(sessionID, userID uuid.UUID, streamKey string) {
 	}
 	s.queries.UpdateSessionStatus(context.Background(), sessionID, status)
 	log.Printf("post-processing complete for session %s (status=%s)", sessionID, status)
+}
+
+// postProcess converts FLV → MP4 via FFmpeg, then uploads.
+func (s *Server) postProcess(sessionID, userID uuid.UUID, streamKey string) {
+	log.Printf("post-processing session %s", sessionID)
+
+	sessionDir := filepath.Join(s.cfg.SegmentDir, sessionID.String())
+	flvPath := filepath.Join(sessionDir, "recording.flv")
+	mp4Path := filepath.Join(sessionDir, "recording.mp4")
+
+	if _, err := os.Stat(flvPath); os.IsNotExist(err) {
+		log.Printf("no FLV file found for session %s", sessionID)
+		s.queries.UpdateSessionStatus(context.Background(), sessionID, "failed")
+		return
+	}
+
+	// Remux FLV → MP4 (no re-encode, so it's fast). -movflags +faststart moves
+	// the moov atom to the front so the file is streamable.
+	if err := runFFmpeg("-hide_banner", "-loglevel", "error",
+		"-i", flvPath, "-c", "copy", "-movflags", "+faststart", "-y", mp4Path); err != nil {
+		log.Printf("FFmpeg conversion failed for session %s: %v", sessionID, err)
+		// Still mark as "finalized" — the FLV is still usable
+		s.queries.UpdateSessionStatus(context.Background(), sessionID, "finalized_flv")
+		return
+	}
+
+	// The MP4 is now the canonical artifact — drop the raw FLV to free disk.
+	removeRawRecording(flvPath)
+
+	log.Printf("MP4 ready: %s", mp4Path)
+	s.finishAndUpload(sessionID, userID, streamKey, mp4Path)
 }
 
 // uploadToGoogleDrive uploads the MP4 to the user's Google Drive if connected.
@@ -403,8 +422,7 @@ func (s *Server) PostProcessWebSession(sessionID, userID uuid.UUID, streamKey, r
 func (s *Server) postProcessWeb(sessionID, userID uuid.UUID, streamKey, rawPath, mimeType string) {
 	log.Printf("post-processing web session %s (format: %s)", sessionID, mimeType)
 
-	sessionDir := filepath.Join(s.cfg.SegmentDir, sessionID.String())
-	mp4Path := filepath.Join(sessionDir, "recording.mp4")
+	mp4Path := filepath.Join(s.cfg.SegmentDir, sessionID.String(), "recording.mp4")
 
 	if _, err := os.Stat(rawPath); os.IsNotExist(err) {
 		log.Printf("no raw file found for web session %s", sessionID)
@@ -412,42 +430,19 @@ func (s *Server) postProcessWeb(sessionID, userID uuid.UUID, streamKey, rawPath,
 		return
 	}
 
-	// Convert to MP4 using FFmpeg (10-minute timeout to prevent hanging).
-	// Browser may send webm (VP8/VP9+Opus) or mp4 (H.264+AAC).
-	// Re-encode to ensure MP4 compatibility in all cases.
-	ffmpegCtx, ffmpegCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ffmpegCancel()
-
-	cmd := exec.CommandContext(
-		ffmpegCtx,
-		"ffmpeg",
-		"-i", rawPath,
-		"-c:v", "libx264",
-		"-preset", "fast",
-		"-c:a", "aac",
-		"-movflags", "+faststart",
-		"-y",
-		mp4Path,
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	// Browser sends WebM (VP8/VP9+Opus) or MP4 (H.264+AAC); re-encode to a
+	// uniform H.264/AAC MP4 so every recording is consistently playable.
+	if err := runFFmpeg("-hide_banner", "-loglevel", "error",
+		"-i", rawPath, "-c:v", "libx264", "-preset", "fast", "-c:a", "aac",
+		"-movflags", "+faststart", "-y", mp4Path); err != nil {
 		log.Printf("FFmpeg conversion failed for web session %s: %v", sessionID, err)
 		s.queries.UpdateSessionStatus(context.Background(), sessionID, "finalized_raw")
 		return
 	}
 
+	// The MP4 is now the canonical artifact — drop the raw upload to free disk.
+	removeRawRecording(rawPath)
+
 	log.Printf("MP4 ready (web): %s", mp4Path)
-
-	// Reuse existing upload functions
-	driveOk := s.uploadToGoogleDrive(sessionID, userID, mp4Path)
-	igOk := s.postToInstagram(sessionID, userID, streamKey)
-
-	status := "processed"
-	if driveOk || igOk {
-		status = "uploaded"
-	}
-	s.queries.UpdateSessionStatus(context.Background(), sessionID, status)
-	log.Printf("post-processing complete for web session %s (status=%s)", sessionID, status)
+	s.finishAndUpload(sessionID, userID, streamKey, mp4Path)
 }
